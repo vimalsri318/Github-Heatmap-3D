@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Admin · GitHub Heatmap 3D</title>
+  </head>
+  <body>
+    <header class="top">
+      <a href="/" class="brand">Heatmap <b>3D</b> <span>admin</span></a>
+      <div class="range" role="radiogroup" aria-label="Time range" id="range">
+        <button type="button" role="radio" data-days="1" aria-checked="false">Today</button>
+        <button type="button" role="radio" data-days="7" aria-checked="false">7 days</button>
+        <button type="button" role="radio" data-days="30" aria-checked="true">30 days</button>
+        <button type="button" role="radio" data-days="90" aria-checked="false">90 days</button>
+      </div>
+      <div id="account" class="account"></div>
+    </header>
+
+    <main id="app">
+      <section id="gate" class="gate">
+        <h1>Admin</h1>
+        <p id="gateText">Sign in with an admin account to see who is using Heatmap 3D.</p>
+        <button type="button" id="signIn" class="primary">Sign in with Google</button>
+      </section>
+
+      <div id="dash" hidden>
+        <section class="tiles" id="tiles"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="chartTitle">Visitors per day</h2>
+            <div class="seg" role="radiogroup" aria-label="Chart shows" id="metric">
+              <button type="button" role="radio" data-metric="visitors" aria-checked="true">Visitors</button>
+              <button type="button" role="radio" data-metric="views" aria-checked="false">Page views</button>
+              <button type="button" role="radio" data-metric="embeds" aria-checked="false">Embed views</button>
+              <button type="button" role="radio" data-metric="renders" aria-checked="false">README renders</button>
+            </div>
+          </div>
+          <div class="chart" id="chart"></div>
+          <details class="table-view"><summary>Show as a table</summary><div id="chartTable"></div></details>
+        </section>
+
+        <section class="panel">
+          <h2>From first visit to copied code</h2>
+          <p class="hint">Browser sessions on the site. Each step counts sessions that also did the steps before it.</p>
+          <div id="funnel" class="funnel"></div>
+        </section>
+
+        <div class="grid" id="lists"></div>
+
+        <section class="panel">
+          <h2>Latest activity</h2>
+          <div class="scroll"><table class="live" id="live"></table></div>
+        </section>
+
+        <p class="foot" id="foot"></p>
+      </div>
+    </main>
+    <script type="module" src="/src/admin.js"></script>
+  </body>
+</html>

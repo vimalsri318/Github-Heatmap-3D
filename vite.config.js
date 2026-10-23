@@ -48,6 +48,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, 'index.html'),
         studio: resolve(import.meta.dirname, 'studio.html'),
         embed: resolve(import.meta.dirname, 'embed.html'),
+        admin: resolve(import.meta.dirname, 'admin.html'),
       },
     },
   },
