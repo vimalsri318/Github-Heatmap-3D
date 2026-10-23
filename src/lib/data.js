@@ -1,16 +1,14 @@
-// Fetches a user's contribution calendar.
-// Uses the public github-contributions-api (scrapes the public profile calendar, no token needed).
-const API = 'https://github-contributions-api.jogruber.de/v4';
-
+// Fetches a user's contribution calendar in the browser, through our own /api/contributions.
+// That endpoint caches it for everyone (see api/_contributions.js), so a popular embed costs
+// one upstream lookup an hour instead of one per visitor.
 export async function fetchContributions(username, year) {
-  const res = await fetch(`${API}/${encodeURIComponent(username)}?y=${year}`);
+  const res = await fetch(`/api/contributions?${new URLSearchParams({ user: username, year })}`);
+  const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(res.status === 404 ? `User "${username}" not found` : `Request failed (${res.status})`);
+    throw new Error(json.error || (res.status === 404 ? `User "${username}" not found` : `Request failed (${res.status})`));
   }
-  const json = await res.json();
-  if (json.error) throw new Error(json.error);
   // [{ date: 'YYYY-MM-DD', count: number, level: 0-4 }]
-  return json.contributions;
+  return json;
 }
 
 // Deterministic sample data so the scene isn't empty before a username is entered.
