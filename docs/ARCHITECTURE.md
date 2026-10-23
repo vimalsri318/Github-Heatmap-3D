@@ -125,7 +125,9 @@ Measured on the dev server: 400 requests across 4 users made 1 GitHub call (3 us
 
 ## Before launch
 
-- [ ] Set `GITHUB_TOKEN` in Vercel.
+- [ ] Set `GITHUB_TOKEN`, `ADMIN_EMAILS` and `ANALYTICS_SALT` in Vercel.
+- [ ] Run `npm run db:migrate` against production (adds the analytics tables).
+- [ ] Add a log drain and an uptime monitor on `/api/health` (see [OBSERVABILITY.md](OBSERVABILITY.md)).
 - [ ] Add a Vercel Firewall rate-limit rule on `/api/*`.
 - [ ] Run the load test against a preview deployment, then production.
 - [ ] Check the animated image in a real README, on desktop and in the GitHub mobile app.
