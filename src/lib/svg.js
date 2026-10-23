@@ -105,11 +105,30 @@ export function renderSvg(days, opts) {
   }
 
   // ---- bars, back to front ----
+  const motion = animation(opts.animate, cols);
   const sorted = [...cells].sort((a, b) => depth(a.x, a.z) - depth(b.x, b.z));
   let barsSvg = '';
-  for (const c of sorted)
-    barsSvg += box(c.x - half, c.x + half, 0, c.h, c.z - half, c.z + half, theme.levels[c.day.level]);
-  body += `<g>${barsSvg}</g>`;
+  let clips = '';
+  let clipCount = 0;
+  for (const c of sorted) {
+    const [bx0, bx1, bz0, bz1] = [c.x - half, c.x + half, c.z - half, c.z + half];
+    const faces = box(bx0, bx1, 0, c.h, bz0, bz1, theme.levels[c.day.level]);
+    // empty days are flat tiles already, so only days with contributions rise
+    if (!motion || c.day.count === 0) {
+      barsSvg += faces;
+      continue;
+    }
+    // The bar starts sunk into the board and slides up. Clipping it to its own full-height
+    // outline hides the part still below the surface, so it looks like it is growing.
+    const corners = [];
+    for (const x of [bx0, bx1]) for (const y of [0, c.h]) for (const z of [bz0, bz1]) corners.push(project(x, y, z));
+    const id = `c${(clipCount++).toString(36)}`;
+    clips += `<clipPath id="${id}"><path d="M${hull(corners).map(([x, y]) => `${r1(x)} ${r1(y)}`).join('L')}Z"/></clipPath>`;
+    const sink = r1((c.h - MIN_H) * cosP * SCALE);
+    barsSvg += `<g clip-path="url(#${id})"><g>${motion.bar(c.col, c.row, sink)}${faces}</g></g>`;
+  }
+  body += `${clips ? `<defs>${clips}</defs>` : ''}<g id="bars">${barsSvg}</g>`;
+  if (motion) body += SHINE; // filled in once the bounds are known
 
   // ---- name on the front edge ----
   if (opts.title) {
@@ -134,11 +153,92 @@ export function renderSvg(days, opts) {
   const tx = r1(pad - bounds.minX);
   const ty = r1(pad + headerH - bounds.minY);
   const bg = opts.transparent ? '' : `<rect width="100%" height="100%" rx="12" fill="${theme.background}"/>`;
+  if (motion) body = body.replace(SHINE, motion.shine(bounds, theme));
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" font-family="${FONT}" role="img" aria-label="${esc(opts.user || 'sample')}'s GitHub contributions in 3D">
 <defs><filter id="blur" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="8"/></filter></defs>
 ${bg}${header}<g transform="translate(${tx} ${ty})">${body}</g>
 </svg>`;
+}
+
+const SHINE = '<!--shine-->';
+const r3 = (n) => Math.round(n * 1000) / 1000;
+
+/** Convex outline of a set of points (monotone chain). */
+function hull(points) {
+  const p = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list) => {
+    const out = [];
+    for (const q of list) {
+      while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], q) <= 0) out.pop();
+      out.push(q);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(p), ...half([...p].reverse())];
+}
+
+/** The animation modes the 3D README image knows. Anything else means a still image. */
+export const ANIMATIONS = { grow: 'Rise once', loop: 'Rise and fall, on repeat' };
+export const getAnimation = (v) => (v === '1' || v === 'true' ? 'grow' : ANIMATIONS[v] ? v : null);
+
+// Animation written into the SVG itself (SMIL), so it plays inside an <img>, GitHub READMEs
+// included, where scripts never run. Bars rise in a wave from January to December, then a soft
+// light sweeps across the city. Renderers without SMIL just show the finished board.
+function animation(mode, cols) {
+  mode = getAnimation(String(mode));
+  if (!mode) return null;
+  const STEP = 0.035; // s between neighbouring weeks
+  const RISE = 0.75; // s for one bar to rise
+  const wave = (cols - 1) * STEP + 6 * 0.02; // the last bar starts here
+  const risen = wave + RISE; // whole board up
+  const HOLD = 6;
+  const loop = mode === 'loop';
+  const T = loop ? risen + HOLD + wave + 0.5 + 0.8 : risen; // one cycle, in seconds
+  const ease = '.2 .8 .3 1'; // quick start, soft landing
+  const flat = '0 0 1 1';
+  const timing = loop ? `dur="${r3(T)}s" repeatCount="indefinite"` : `dur="${r3(T)}s" fill="freeze"`;
+
+  return {
+    bar(col, row, sink) {
+      const at = col * STEP + row * 0.02;
+      const k = [0, at / T, (at + RISE) / T];
+      const values = [sink, sink, 0];
+      const splines = [flat, ease];
+      if (loop) {
+        const down = risen + HOLD + at; // fall in the same order they rose
+        k.push(down / T, (down + 0.5) / T, 1);
+        values.push(0, sink, sink);
+        splines.push(flat, '.6 0 .8 .4', flat);
+      } else if (k[2] < 0.9999) {
+        k.push(1);
+        values.push(0);
+        splines.push(flat);
+      }
+      return `<animateTransform attributeName="transform" type="translate" ${timing} calcMode="spline" keyTimes="${k.map((t) => r3(Math.min(1, t))).join(';')}" keySplines="${splines.join(';')}" values="${values.map((v) => `0 ${v}`).join(';')}"/>`;
+    },
+    // a band of light, drawn only where the bars are (the bars group is the mask)
+    shine(b, theme) {
+      const band = r3(Math.max(120, (b.maxX - b.minX) * 0.22));
+      const sweep = 2.4;
+      const from = r3(b.minX - band);
+      const to = r3(b.maxX + band);
+      const go = '.45 0 .55 1';
+      const anim = loop
+        ? `dur="${r3(T)}s" repeatCount="indefinite" keyTimes="0;${r3((risen + 0.2) / T)};${r3((risen + 0.2 + sweep) / T)};1" keySplines="${flat};${go};${flat}" values="${from} 0;${from} 0;${to} 0;${to} 0"`
+        : `begin="${r3(risen)}s" dur="${sweep + 4}s" repeatCount="indefinite" keyTimes="0;${r3(sweep / (sweep + 4))};1" keySplines="${go};${flat}" values="${from} 0;${to} 0;${to} 0"`;
+      const strength = theme.dark ? 0.3 : 0.45;
+      return (
+        `<defs><linearGradient id="shine-g" gradientUnits="userSpaceOnUse" x1="${-band}" y1="0" x2="0" y2="${r3(band * 0.35)}">` +
+        `<stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity="${strength}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>` +
+        `<mask id="shine-m" mask-type="alpha" style="mask-type:alpha"><use href="#bars"/></mask></defs>` +
+        `<g mask="url(#shine-m)"><g transform="translate(${from} 0)"><animateTransform attributeName="transform" type="translate" calcMode="spline" ${anim}/>` +
+        `<rect x="${-band}" y="${r3(b.minY)}" width="${band}" height="${r3(b.maxY - b.minY)}" fill="url(#shine-g)"/></g></g>`
+      );
+    },
+  };
 }
 
 export function renderMessageSvg(message, themeId) {

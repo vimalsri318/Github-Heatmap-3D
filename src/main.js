@@ -9,6 +9,7 @@ import { OPTIONS, parseOptions, toParams, cameraToAngles } from './lib/options.j
 import { STYLES, getStyle } from './lib/styles/index.js';
 import { composeSong, createSongPlayer, renderSongWav } from './lib/song.js';
 import { CHART_TYPES } from './lib/charts.js';
+import { ANIMATIONS } from './lib/svg.js';
 import { createViewPad } from './lib/viewpad.js';
 import { suggestDesktop } from './lib/desktop-hint.js';
 import { owns, signInAvailable, signInWithGoogle, currentAccount, onAccountChange, startAccounts, mountAccountButton, authFetch } from './lib/account.js';
@@ -22,7 +23,7 @@ const SITE = (import.meta.env.VITE_SITE_URL || location.origin).replace(/\/$/, '
 
 // Which options each embed type understands.
 const EMBED_KEYS = Object.keys(OPTIONS).filter((k) => k !== 'angle' && k !== 'tilt');
-const README_KEYS = ['type', 'user', 'year', 'theme', 'height', 'log', 'barSize', 'shadows', 'base', 'labels', 'title', 'transparent', 'angle', 'tilt'];
+const README_KEYS = ['type', 'user', 'year', 'theme', 'height', 'log', 'barSize', 'shadows', 'base', 'labels', 'title', 'transparent', 'angle', 'tilt', 'animate'];
 
 // ---------- state ----------
 const params = new URLSearchParams(location.search);
@@ -425,7 +426,7 @@ let tab = 'website';
 const TAB_HINTS = {
   website: 'One line of HTML with the live, spinnable 3D. Set the size it should take on your page.',
   script: 'Same live 3D, as a div plus a small script. Every option is a data-* attribute you can edit by hand.',
-  readme: 'READMEs only show images, so this is a picture of your current view (or a 2D card) that links to the live 3D.',
+  readme: 'READMEs only show images, so this is an animated picture of your current view (or a 2D card) that links to the live 3D. No scripts or GIFs needed.',
   link: 'A link to exactly this view: your world, colors and angle.',
 };
 
@@ -479,7 +480,9 @@ const kebab = (s) => s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 const cssSize = (v) => (/^\d+$/.test(v.trim()) ? `${v.trim()}px` : v.trim() || '100%');
 
 function readmeParams() {
-  const opts = { ...state, ...(state.camera ? cameraToAngles(state.camera) : {}), type: $('readmeType').value };
+  const type = $('readmeType').value;
+  const animate = type === '3d' ? $('readmeAnim').value : '0'; // only the 3D board animates
+  const opts = { ...state, ...(state.camera ? cameraToAngles(state.camera) : {}), type, animate };
   return toParams(opts, README_KEYS);
 }
 
@@ -538,6 +541,7 @@ function renderCode() {
   $('tabHint').textContent = TAB_HINTS[tab];
   $('sizeFields').hidden = !(tab === 'website' || tab === 'script');
   $('readmeTypeField').hidden = tab !== 'readme';
+  $('readmeAnimField').hidden = tab !== 'readme' || $('readmeType').value !== '3d';
   $('readmePreview').hidden = tab !== 'readme';
 }
 
@@ -564,6 +568,8 @@ $('embedKind').addEventListener('click', (e) => {
 $('embedWidth').addEventListener('input', renderCode);
 for (const [id, name] of [['3d', '3D board (City)'], ...Object.entries(CHART_TYPES)]) $('readmeType').add(new Option(name, id));
 $('readmeType').addEventListener('change', renderCode);
+for (const [id, name] of [['grow', ANIMATIONS.grow], ['loop', ANIMATIONS.loop], ['0', 'None (still image)']]) $('readmeAnim').add(new Option(name, id));
+$('readmeAnim').addEventListener('change', renderCode);
 $('embedHeight').addEventListener('input', renderCode);
 
 $('copy').addEventListener('click', async () => {

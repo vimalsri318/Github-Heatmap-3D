@@ -451,7 +451,7 @@ daysPromise.then(renderFeatureArt);
 const SITE = location.origin;
 const SNIPPETS = {
   embedCode: `<iframe src="${SITE}/embed.html?user=you&style=galaxy"\n  style="width:100%;height:420px;border:0"></iframe>`,
-  readmeCode: `[![My year in 3D](${SITE}/api/heatmap?user=you)](${SITE}/studio.html?user=you)`,
+  readmeCode: `[![My year in 3D](${SITE}/api/heatmap?user=you&animate=grow)](${SITE}/studio.html?user=you)`,
   linkCode: `${SITE}/studio.html?user=you&style=night`,
 };
 const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);

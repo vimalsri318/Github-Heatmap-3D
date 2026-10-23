@@ -30,6 +30,7 @@ export const OPTIONS = {
   key: { type: 'string', default: '' }, // proof of purchase for a Pro world in an embed (from /api/embed-key)
   // README image (SVG) only
   type: { type: 'string', default: '3d' }, // 3d, or a 2D design: card, donut, months, calendar
+  animate: { type: 'string', default: '0' }, // 3D image only: 0 (still), grow (rise once), loop
   // the camera's angle around and above the board, in degrees
   angle: { type: 'number', default: -20, min: -180, max: 180 },
   tilt: { type: 'number', default: 30, min: 5, max: 85 },
