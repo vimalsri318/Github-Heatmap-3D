@@ -498,77 +498,6 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border-radius: 5px; backgr
 .print-model svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 14px 18px rgba(120, 60, 20, 0.25)); }
 .b-print:hover .print-model { transform: translateY(-4px) rotate(-1.5deg); }
 
-/* ---------- pricing ---------- */
-.plans { width: min(1120px, 100%); display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 16px; align-items: center; }
-.billing { margin-top: -20px; }
-.billing .save { font: 600 10.5px/1 var(--mono); padding: 3px 6px; border-radius: 5px; margin-left: 4px; color: #1a0f05; background: var(--accent); }
-.plan-sub { color: var(--muted); font-size: 14px; margin-top: -8px; }
-.plan ul i, .plan-pro ul i {
-  flex: none; width: 18px; height: 18px; margin-top: 2px; border-radius: 50%; display: grid; place-items: center;
-  color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-.plan ul i svg, .plan-pro ul i svg { width: 12px; height: 12px; }
-
-/* Pro: a light that travels around the border, a fan of the worlds you get, a shimmering button */
-@property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.plan-pro {
-  --angle: 0deg;
-  position: relative; isolation: isolate; padding: 1.5px; border-radius: 30px;
-  background: conic-gradient(from var(--angle), var(--line-2) 0 52%, #ffcf8f 66%, #ff7a59 74%, #b58cff 82%, var(--line-2) 94%);
-  animation: travel 6s linear infinite;
-}
-.plan-pro::before { /* soft colored glow behind the card */
-  content: ''; position: absolute; inset: 18px; z-index: -1; border-radius: 30px;
-  background: conic-gradient(from var(--angle), transparent 0 50%, #ffb36b 66%, #ff7a59 74%, #b58cff 82%, transparent 94%);
-  filter: blur(34px); opacity: 0.45; animation: inherit;
-}
-@keyframes travel { to { --angle: 360deg; } }
-.pro-in {
-  border-radius: 28.5px; padding: 26px 26px 28px; display: grid; gap: 16px;
-  background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--panel) 60%);
-}
-.pro-top { display: flex; align-items: center; justify-content: space-between; }
-.pro-word { font: 900 34px/1 var(--dot); color: var(--accent); letter-spacing: 0.04em; text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent); }
-.pro-chip { font: 600 11px/1 var(--mono); letter-spacing: 0.04em; padding: 6px 9px; border-radius: 999px; color: var(--text); background: var(--hover); border: 1px solid var(--line-2); }
-.pro-fan { position: relative; height: 112px; margin: 2px 0 4px; }
-.pro-fan img {
-  position: absolute; top: 6px; left: 50%; width: 46%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
-  transition: transform 0.5s cubic-bezier(.2,.8,.2,1);
-}
-.pro-fan img:nth-child(1) { transform: translateX(-108%) rotate(-8deg); }
-.pro-fan img:nth-child(2) { transform: translateX(-50%) translateY(-6px); z-index: 1; }
-.pro-fan img:nth-child(3) { transform: translateX(8%) rotate(8deg); }
-.plan-pro:hover .pro-fan img:nth-child(1) { transform: translateX(-118%) rotate(-12deg) translateY(4px); }
-.plan-pro:hover .pro-fan img:nth-child(2) { transform: translateX(-50%) translateY(-12px) scale(1.04); }
-.plan-pro:hover .pro-fan img:nth-child(3) { transform: translateX(18%) rotate(12deg) translateY(4px); }
-.pro-price { font-size: 56px; }
-.pro-price span { display: inline-block; transition: transform 0.35s cubic-bezier(.3,1.4,.5,1), opacity 0.2s; }
-.pro-price span.swap { transform: translateY(-10px); opacity: 0; }
-.pro-billed { color: var(--muted); font: 12.5px var(--mono); margin-top: -10px; }
-.plan-pro ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 15px; color: var(--list); }
-.plan-pro li { display: flex; gap: 10px; }
-.pro-btn {
-  position: relative; overflow: hidden; justify-content: center; padding: 14px 20px; font-size: 16px;
-  background: linear-gradient(180deg, #ffc68f, var(--accent)); color: #1a0f05;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 -2px 0 rgba(0, 0, 0, 0.12);
-}
-.pro-btn:hover { background: linear-gradient(180deg, #ffd3a6, #f5b070); }
-.pro-btn::after { /* shimmer */
-  content: ''; position: absolute; inset: 0; transform: translateX(-120%);
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
-  animation: shimmer 3.2s ease-in-out infinite;
-}
-@keyframes shimmer { 60%, 100% { transform: translateX(120%); } }
-.plan .bezel-in { padding: 26px; display: grid; gap: 16px; }
-.plan h3 { font-size: 18px; display: flex; align-items: center; gap: 10px; letter-spacing: -0.01em; }
-.plan h3 .xcard-tag { position: static; }
-.price { font: 700 46px/1 var(--sans); letter-spacing: -0.04em; display: flex; align-items: baseline; gap: 10px; }
-.price small { font: 400 13px var(--mono); color: var(--muted); letter-spacing: 0; }
-.plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; color: var(--list); font-size: 15px; }
-.plan li { display: flex; gap: 10px; }
-.note { color: var(--muted); font: 13px var(--mono); min-height: 1.4em; text-align: center; }
-
 /* ---------- footer ---------- */
 .footer { padding: 40px var(--gutter) 28px; border-top: 1px solid var(--line); overflow: hidden; }
 .wordmark {
@@ -601,8 +530,6 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border-radius: 5px; backgr
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bento > * { grid-column: span 2 !important; grid-row: auto !important; }
   .b-card { order: -2; } .b-themes, .b-donut { order: -1; } /* the swatches sit between the cards they recolor */
-  .plans { grid-template-columns: minmax(0, 1fr); }
-  .plan-pro { order: -1; }
 }
 @media (max-width: 760px) {
   .nav-links { display: none; }
@@ -656,27 +583,6 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border-radius: 5px; backgr
   color: #fff; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(6px); opacity: 0; transform: translateY(4px); transition: opacity 0.25s, transform 0.25s;
 }
 .tile:hover span, .tile-big span { opacity: 1; transform: none; }
-
-/* ---------- explore: Pro in gold ---------- */
-:root { --gold-1: #ffe29a; --gold-2: #e9b44c; --gold-3: #b9832a; }
-.plan-toggle [data-plan='pro'][aria-selected='true'] { color: #2a1b04; }
-.plan-toggle:has([data-plan='pro'][aria-selected='true']) .seg-glider { background: linear-gradient(180deg, var(--gold-1), var(--gold-2)); box-shadow: 0 0 22px rgba(233, 180, 76, 0.55); }
-.show-tag.pro {
-  color: #2a1b04; background: linear-gradient(180deg, var(--gold-1), var(--gold-2));
-  box-shadow: 0 0 18px rgba(233, 180, 76, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-}
-.plan-view[data-plan='pro'] .show {
-  --angle: 0deg; position: relative; isolation: isolate; border-color: transparent;
-  background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box,
-    conic-gradient(from var(--angle), rgba(233, 180, 76, 0.15) 0 50%, var(--gold-1) 64%, var(--gold-2) 72%, rgba(233, 180, 76, 0.15) 86%) border-box;
-  border: 1.5px solid transparent; animation: travel 6s linear infinite;
-  box-shadow: 0 0 60px rgba(233, 180, 76, 0.16);
-}
-.plan-view[data-plan='pro'] .show-info h3 {
-  background: linear-gradient(180deg, var(--text) 30%, color-mix(in srgb, var(--gold-3) 70%, var(--text))); -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.plan-view[data-plan='pro'] .show-actions .pill-btn:not(.pill-btn-ghost) { background: linear-gradient(180deg, var(--gold-1), var(--gold-2)); color: #2a1b04; }
-.slider-dots button[data-on] { background: var(--gold-2); }
 
 /* ---------- what you can do: share link on an iPhone ---------- */
 .iphone {
@@ -774,29 +680,12 @@ kbd { font: 500 11px/1 var(--mono); padding: 3px 5px; border-radius: 5px; backgr
 }
 .hero-pad { --vp-bg: transparent; }
 
-/* ---------- pricing: per-day prices, and one world on its own ---------- */
-.pro-was { align-self: center; font: 500 15px var(--sans); color: var(--muted); opacity: 0.7; }
-.pro-was[hidden] { display: none; }
-.one-world { width: min(1120px, 100%); margin-top: -20px; }
-.one-in { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; padding: 18px 22px; }
-.one-text { display: grid; gap: 2px; flex: 1 1 220px; }
-.one-text b { font-size: 16px; }
-.one-text span { color: var(--muted); font-size: 14px; }
-.one-worlds { display: flex; flex-wrap: wrap; gap: 6px; }
-.one-worlds span { padding: 6px 10px; border-radius: 999px; font-size: 13px; color: var(--muted); background: var(--hover); }
-.one-price { display: grid; line-height: 1.1; }
-.one-price b { font: 700 24px/1 var(--sans); letter-spacing: -0.03em; }
-.one-price small { color: var(--muted); font-size: 12px; }
-.price-country {
-  margin-top: -30px; display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 999px; cursor: pointer;
-  font: 13px var(--sans); color: var(--muted); background: var(--hover); border: 1px solid var(--line);
-}
-.price-country b { color: var(--text); font-weight: 600; }
-.price-country span:first-child { font-size: 16px; line-height: 1; }
-
-/* ---------- account in the nav ---------- */
-.nav-account { display: inline-flex; align-items: center; min-height: 28px; }
-.nav-signin { border: 0; background: none; cursor: pointer; padding: 7px 12px; border-radius: 999px; font: 550 14px var(--sans); color: var(--text); }
-.nav-signin:hover { background: var(--hover); }
-.nav-account[data-pro]::after { content: 'PRO'; margin-left: 6px; font: 700 9.5px/1 var(--mono); padding: 4px 6px; border-radius: 999px; color: #2a1b04; background: linear-gradient(180deg, #ffe29a, #e9b44c); }
-@media (max-width: 760px) { .nav-signin { padding: 6px 8px; font-size: 13px; } }
+/* ---------- open source ---------- */
+.oss { width: min(880px, 100%); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 760px) { .oss { grid-template-columns: minmax(0, 1fr); } }
+.oss-card { display: grid; gap: 16px; align-content: start; justify-items: start; padding: 28px; border-radius: 24px; background: var(--hover); box-shadow: inset 0 0 0 1px var(--line); }
+.oss-card h3 { margin: 0; font-size: 22px; }
+.oss-card .ticks { margin: 0; }
+.nav-gh { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; color: var(--text); }
+.nav-gh:hover { background: var(--hover); }
+.nav-gh svg { width: 18px; height: 18px; }

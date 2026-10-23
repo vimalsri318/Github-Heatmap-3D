@@ -2,6 +2,8 @@
 
 Turn any GitHub contribution graph into an interactive, 360° rotatable 3D model, then put it on your website or your GitHub README.
 
+Free and open source (MIT). Every world, the song, embeds, animated README images and STL export work for everyone, with no account.
+
 Every day is a bar whose height matches that day's contribution count.
 
 ## Styles
@@ -9,15 +11,15 @@ Every day is a bar whose height matches that day's contribution count.
 | Style | What it shows |
 |---|---|
 | **City** | One bar per day, as tall as that day's contributions. 8 color themes. |
-| **Night City** (Pro) | A city block for every day, after dark: apartments, office blocks and glass towers with spires, as tall as the day's contributions, with lit window grids, street lamps, moving car lights and parks on empty days. |
-| **Galaxy** (Pro) | A realistic four-armed spiral galaxy (≈90k particles, dust lanes, nebulae, twinkling starfield) from January at the core to December at the rim. Every day is a star colored like a real one, from red dwarf to blue giant; the twelve biggest days are planets (gas giants, rocky, ocean and ice worlds, the top three ringed). |
-| **Forest** (Pro) | An island with a realistic tree for every day: oak, ash, aspen and pine, as tall as the day's contributions, with bushes for quiet days. Four leaf palettes: Spring (greens with pink blossoms on the busiest days), Autumn, Sakura and Dream. |
+| **Night City** | A city block for every day, after dark: apartments, office blocks and glass towers with spires, as tall as the day's contributions, with lit window grids, street lamps, moving car lights and parks on empty days. |
+| **Galaxy** | A realistic four-armed spiral galaxy (≈90k particles, dust lanes, nebulae, twinkling starfield) from January at the core to December at the rim. Every day is a star colored like a real one, from red dwarf to blue giant; the twelve biggest days are planets (gas giants, rocky, ocean and ice worlds, the top three ringed). |
+| **Forest** | An island with a realistic tree for every day: oak, ash, aspen and pine, as tall as the day's contributions, with bushes for quiet days. Four leaf palettes: Spring (greens with pink blossoms on the busiest days), Autumn, Sakura and Dream. |
 
 ## 2D designs
 
 Prefer flat? The same year as clean cards that work as GitHub README images and follow the color theme: **Stats card**, **Weekly rhythm** (donut chart), **Monthly bars** and the **Classic grid**. Use `type=card|donut|months|calendar` on the image API.
 
-## Your year as a song (Pro)
+## Your year as a song
 
 Every profile gets its own song, composed from its contributions. The key, scale and chords come from the username, the tempo from how much was shipped, and every day is one note: busy days play melody and drums, quiet stretches drift into soft pads. Play it on the site while the 3D view follows along, or download it as a WAV file.
 
@@ -113,11 +115,15 @@ Built for [Vercel](https://vercel.com): import the repo and deploy. The static s
 ## Project layout
 
 ```
-index.html, src/landing.*   landing page: hero, style showcase, song, designs, pricing
+index.html, src/landing.*   landing page: hero, style showcase, song, designs
 studio.html, src/main.js    the Studio: editor + embed code generator
 embed.html, src/embed.js    bare 3D view for iframes
 public/embed.js             script-tag loader (creates the iframe)
 api/heatmap.js              README image endpoint (SVG)
+api/contributions.js        contribution data for the 3D views (cached, see docs/ARCHITECTURE.md)
+api/track.js, admin.html    anonymous analytics and the admin page
+api/_observe.js             request logs, traces and API metrics
+docs/ARCHITECTURE.md        how requests flow, caching, failure handling, capacity
 src/lib/heatmap.js          the 3D component: createHeatmap(element, options)
 src/lib/styles/             City, Night City, Galaxy, Forest
 src/lib/song.js             song composer, player and WAV export
@@ -130,7 +136,7 @@ src/lib/data.js             contribution data + stats
 
 ## Data
 
-Contributions come from the public [github-contributions-api](https://github.com/grubersjoe/github-contributions-api), which reads public profile calendars (no token needed). Private contributions only appear if the user has turned on "Include private contributions" on their GitHub profile.
+Contributions come from GitHub's GraphQL API when `GITHUB_TOKEN` is set, with the public [github-contributions-api](https://github.com/grubersjoe/github-contributions-api) as backup (and as the only source without a token). Private contributions only appear if the user has turned on "Include private contributions" on their GitHub profile.
 
 Built with [Three.js](https://threejs.org) and [Vite](https://vite.dev). Forest trees are generated with [EZ-Tree](https://github.com/dgreenheck/ez-tree) by Daniel Greenheck (MIT); its bark textures come from [Poly Haven](https://polyhaven.com) and [TextureCan](https://www.texturecan.com) (CC0).
 
@@ -163,3 +169,11 @@ Setup: run `npm run db:migrate` (adds the `events` and `daily_counts` tables) an
 ```bash
 TEST_DATABASE_URL=postgresql://localhost/heatmap_test npm test   # also runs the analytics tests (throwaway database only)
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). To report a security problem, see [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE)

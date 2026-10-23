@@ -13,7 +13,7 @@ export function device(ua = '') {
 
 /** Same person, same day → same id. Next day it changes, and it can't be turned back into an IP. */
 export function visitorId(ip, ua, day = new Date().toISOString().slice(0, 10)) {
-  const salt = process.env.ANALYTICS_SALT || process.env.EMBED_SECRET || 'dev';
+  const salt = process.env.ANALYTICS_SALT || process.env.EMBED_SECRET || 'dev'; // EMBED_SECRET: older deployments
   return createHash('sha256').update(`${salt}|${day}|${ip}|${ua}`).digest('base64url').slice(0, 16);
 }
 

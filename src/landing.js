@@ -1,5 +1,5 @@
 // Landing page: one live 3D hero, expanding style cards that open a live viewer,
-// a bento of features and pricing. Only one 3D view renders at a time, and only while visible.
+// a bento of features and the open-source note. Only one 3D view renders at a time, and only while visible.
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import '@fontsource-variable/doto';
@@ -13,9 +13,6 @@ import { renderChartSvg } from './lib/charts.js';
 import { renderSvg } from './lib/svg.js';
 import { createViewPad } from './lib/viewpad.js';
 import { suggestDesktop } from './lib/desktop-hint.js';
-import { startAccounts, signInWithGoogle, mountAccountButton, onAccountChange, signInAvailable, owns } from './lib/account.js';
-import { pricesFor, money, guessCountry } from './lib/pricing.js';
-import { openRegionPicker } from './lib/region-picker.js';
 import { defaults } from './lib/options.js';
 import { startTracking, track } from './lib/track.js';
 
@@ -557,82 +554,7 @@ const counter = new IntersectionObserver((entries) => {
 });
 document.querySelectorAll('[data-count]').forEach((el) => counter.observe(el));
 
-// ---------- pricing ----------
-const billing = $('billing');
-function moveBillingGlider() {
-  const on = billing.querySelector('[aria-checked="true"]');
-  const g = billing.querySelector('.seg-glider');
-  g.style.width = `${on.offsetWidth}px`;
-  g.style.transform = `translateX(${on.offsetLeft}px)`;
-}
-billing.addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-bill]');
-  if (!b || b.getAttribute('aria-checked') === 'true') return;
-  for (const x of billing.querySelectorAll('button')) x.setAttribute('aria-checked', x === b);
-  moveBillingGlider();
-  yearly = b.dataset.bill === 'year';
-  const price = $('proPrice');
-  price.classList.add('swap');
-  setTimeout(() => {
-    renderPricing();
-    price.classList.remove('swap');
-  }, 180);
-});
-
-// Prices read per day, in the visitor's currency; the full amount is always right under them.
-let yearly = true;
-let country = guessCountry();
-function renderPricing() {
-  const p = pricesFor(country);
-  const m = (n) => money(n, p.currency);
-  $('priceFlag').textContent = p.country.flag;
-  $('priceCountryName').textContent = p.country.name;
-  $('freePrice').textContent = m(0);
-  $('proPrice').textContent = m(yearly ? p.perDay.year : p.perDay.month);
-  $('proWas').textContent = m(p.perDay.month);
-  $('proWas').hidden = !yearly;
-  $('proBilled').textContent = yearly ? `${m(p.year)} a year, that’s ${m(p.year / 12)} a month. Cancel anytime.` : `${m(p.month)} a month. Cancel anytime.`;
-  $('lifePrice').textContent = `${m(p.life)}, one payment`;
-  $('worldPrice').textContent = m(p.world);
-}
-renderPricing();
-$('priceCountry').addEventListener('click', () =>
-  openRegionPicker({
-    current: country,
-    onPick: (code) => {
-      country = code;
-      renderPricing();
-    },
-  }),
-);
-addEventListener('resize', moveBillingGlider);
-document.fonts?.ready.then(moveBillingGlider);
-moveBillingGlider();
-
-for (const b of document.querySelectorAll('[data-checkout]')) {
-  b.addEventListener('click', () => {
-    $('checkoutNote').textContent = 'Checkout opens very soon, with Sign in with Google. Until then you can try every world in the Studio for free.';
-  });
-}
-
-// ---------- account: Sign in in the nav, or the avatar menu (with a PRO mark) once signed in ----------
-let navAccount = '';
-onAccountChange((a) => {
-  const slot = $('navAccount');
-  slot.toggleAttribute('data-pro', Boolean(a) && owns('pro'));
-  if ((a?.id || '') === navAccount) return;
-  navAccount = a?.id || '';
-  if (a) {
-    slot.innerHTML = '';
-    mountAccountButton(slot);
-  } else slot.innerHTML = '<button type="button" class="nav-signin" id="navSignIn">Sign in</button>';
-});
-$('navAccount').addEventListener('click', (e) => {
-  if (!e.target.closest('#navSignIn')) return;
-  if (!signInAvailable()) return;
-  signInWithGoogle().catch(() => {});
-});
 startTracking();
-startAccounts();
+
 
 suggestDesktop();

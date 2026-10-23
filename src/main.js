@@ -13,9 +13,6 @@ import { ANIMATIONS } from './lib/svg.js';
 import { startTracking, track } from './lib/track.js';
 import { createViewPad } from './lib/viewpad.js';
 import { suggestDesktop } from './lib/desktop-hint.js';
-import { owns, signInAvailable, signInWithGoogle, currentAccount, onAccountChange, startAccounts, mountAccountButton, authFetch } from './lib/account.js';
-import { pricesFor, money, guessCountry } from './lib/pricing.js';
-import { openRegionPicker } from './lib/region-picker.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -23,7 +20,7 @@ const $ = (id) => document.getElementById(id);
 const SITE = (import.meta.env.VITE_SITE_URL || location.origin).replace(/\/$/, '');
 
 // Which options each embed type understands.
-const EMBED_KEYS = Object.keys(OPTIONS).filter((k) => k !== 'angle' && k !== 'tilt');
+const EMBED_KEYS = Object.keys(OPTIONS).filter((k) => !['angle', 'tilt', 'type', 'animate'].includes(k));
 const README_KEYS = ['type', 'user', 'year', 'theme', 'height', 'log', 'barSize', 'shadows', 'base', 'labels', 'title', 'transparent', 'angle', 'tilt', 'animate'];
 
 // ---------- state ----------
@@ -83,7 +80,7 @@ const STEPS = {
     text: 'Choose how your year looks. Colors are in the bar at the bottom, next to the worlds.',
     actions: () =>
       Object.entries(STYLES)
-        .map(([id, st]) => `<button type="button" data-pick-style="${id}" aria-pressed="${state.style === id}">${st.name}${st.pro ? ' <small>PRO</small>' : ''}</button>`)
+        .map(([id, st]) => `<button type="button" data-pick-style="${id}" aria-pressed="${state.style === id}">${st.name}</button>`)
         .join(''),
   },
   3: {
@@ -234,7 +231,7 @@ for (const [id, st] of Object.entries(STYLES)) {
   b.type = 'button';
   b.role = 'radio';
   b.dataset.style = id;
-  b.innerHTML = st.pro ? `${st.name} <small>PRO</small>` : st.name; // the tag becomes ✓ once it's yours (syncPlan)
+  b.textContent = st.name;
   b.addEventListener('click', () => update({ style: id }));
   $('styles').appendChild(b);
 }
@@ -358,7 +355,6 @@ $('songSeek').addEventListener('input', (e) => {
 });
 $('downloadSong').addEventListener('click', async () => {
   if (!hasYear()) return showStep(1, NEED_YEAR);
-  if (!owns('song')) return openPaywall('song');
   if (!player) return;
   const btn = $('downloadSong');
   btn.disabled = true;
@@ -388,7 +384,6 @@ $('form').addEventListener('submit', (e) => {
 $('resetView').addEventListener('click', () => map.viewFrom('home'));
 $('exportStl').addEventListener('click', () => {
   if (!hasYear()) return showStep(1, NEED_YEAR);
-  if (STYLES[state.style].pro && !owns(state.style)) return openPaywall(state.style);
   const blob = map.exportSTL();
   if (!blob) return;
   track('export_stl', { style: state.style });
@@ -404,7 +399,6 @@ $('clearCamera').addEventListener('click', () => update({ camera: null }));
 // ---------- drawer ----------
 function setDrawer(open) {
   if (open && !hasYear()) return showStep(1, NEED_YEAR); // no sharing a sample year
-  if (open && STYLES[state.style].pro && !owns(state.style)) return openPaywall(state.style);
   if (open) {
     markStep(4);
     takeShot();
@@ -489,28 +483,10 @@ function readmeParams() {
   return toParams(opts, README_KEYS);
 }
 
-// Pro worlds (and embeds without the badge) carry a key from our server proving they
-// were paid for; without it the embed shows the free City. Fetched once per world.
-const embedKeys = {};
-function embedKeyFor() {
-  const item = STYLES[state.style].pro ? state.style : state.badge ? null : 'pro';
-  if (!item || !owns(item)) return '';
-  if (embedKeys[item] === undefined) {
-    embedKeys[item] = null; // asking
-    authFetch(`/api/embed-key?item=${item}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
-      .then(({ key }) => {
-        embedKeys[item] = key;
-        renderCode();
-      })
-      .catch(() => delete embedKeys[item]);
-  }
-  return embedKeys[item] || '';
-}
 
 function renderCode() {
   if ($('drawer').hidden) return;
-  const embedQuery = toParams({ ...state, key: embedKeyFor() }, EMBED_KEYS).toString();
+  const embedQuery = toParams(state, EMBED_KEYS).toString();
   const pageQuery = toParams(state, EMBED_KEYS).toString(); // links to the Studio don't need the key
   const pageUrl = `${SITE}/studio.html${pageQuery ? '?' + pageQuery : ''}`;
   const embedUrl = `${SITE}/embed.html${embedQuery ? '?' + embedQuery : ''}`;
@@ -620,159 +596,4 @@ syncGuide();
 setTab('website');
 suggestDesktop();
 
-// ---------- the paywall ----------
-// Shown at the moment a Pro world is about to leave the Studio (share, STL, song), never
-// before: you can look at every world for free. Prices are framed per day, a single world
-// can be bought on its own, and the yearly plan is picked by default as the best value.
-// Prices follow the visitor's country (a guess they can change with the globe picker).
-let country = guessCountry();
-const PLANS = {
-  world: (p, name) => `${money(p.world, p.currency)} one time. ${name} stays yours, with embeds, README pictures and STL.`,
-  year: (p) => `${money(p.year, p.currency)} billed once a year. That’s ${money(p.year / 12, p.currency)} a month, ${Math.round((1 - p.year / (p.month * 12)) * 100)}% less than monthly.`,
-  month: (p) => `${money(p.month, p.currency)} billed every month. Cancel anytime.`,
-  life: (p) => `${money(p.life, p.currency)} once. No subscription, ever, and every world we add.`,
-};
-function renderPrices() {
-  const p = pricesFor(country);
-  const day = (n) => money(n, p.currency);
-  $('payFlag').textContent = p.country.flag;
-  $('payCountryName').textContent = p.country.name;
-  $('ppWorld').textContent = money(p.world, p.currency);
-  $('ppYear').textContent = day(p.perDay.year);
-  $('ppYearWas').textContent = day(p.perDay.month);
-  $('ppMonth').textContent = day(p.perDay.month);
-  setPayPlan(payPlan);
-}
-$('payCountry').addEventListener('click', () =>
-  openRegionPicker({
-    current: country,
-    onPick: (code) => {
-      country = code;
-      renderPrices();
-    },
-  }),
-);
-let payItem = '';
-let payPlan = 'year';
-function openPaywall(item) {
-  payItem = item;
-  const whole = item === 'pro'; // "Upgrade" from the plan chip: all of Pro, no single world
-  const name = item === 'song' ? 'your song' : whole ? 'Pro' : STYLES[item].name;
-  $('payTitle').textContent = item === 'song' ? 'Keep your song' : whole ? 'Go Pro' : `Keep your ${name}`;
-  $('payLead').textContent =
-    item === 'song'
-      ? 'Your year, as music. Unlock it to download the song.'
-      : whole
-        ? 'Every world, your song, HD pictures and no badge on your embeds.'
-        : `You made it. Unlock ${name} to share it, embed it on your site and README, and print it.`;
-  $('payWorldName').textContent = item === 'song' ? 'Just the song' : `Just ${name}`;
-  $('payPlans').querySelector('[data-plan="world"]').hidden = whole;
-  if (whole && payPlan === 'world') payPlan = 'year';
-  $('payReady').textContent = item === 'song' ? '♪ Your song is ready' : whole ? 'Your year, in every world' : `Your ${name} is ready`;
-  try {
-    $('payShot').src = map.snapshot('image/jpeg', 0.85);
-  } catch {}
-  renderPrices();
-  const who = currentAccount();
-  $('googleBtn').lastChild.textContent = who ? ` Continue as ${who.name?.split(' ')[0] || who.email}` : ' Continue with Google';
-  $('payNote').textContent = 'Cancel anytime. Your City stays free forever.';
-  $('payNote').classList.remove('pay-warn');
-  $('paywall').showModal();
-  track('paywall_open', { item: payItem });
-}
-function setPayPlan(plan) {
-  payPlan = plan;
-  for (const b of $('payPlans').children) b.setAttribute('aria-checked', b.dataset.plan === plan);
-  $('payBilled').textContent = PLANS[plan](pricesFor(country), payItem === 'song' ? 'Your song' : STYLES[payItem]?.name ?? '');
-}
-$('payPlans').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-plan]');
-  if (b) setPayPlan(b.dataset.plan);
-});
-$('payClose').addEventListener('click', () => $('paywall').close());
-$('paywall').addEventListener('click', (e) => e.target === $('paywall') && $('paywall').close());
-const PENDING = 'pay-after-sign-in'; // Google sign-in may leave the page; reopen the paywall on return
-function signedInNote() {
-  const who = currentAccount();
-  $('payNote').textContent = `Signed in as ${who?.email || who?.name}. Secure checkout opens very soon; we’ll keep your choice for when it does.`;
-  $('payNote').classList.add('pay-warn');
-  $('payPlans').closest('.paywall').querySelectorAll('.pay-steps li').forEach((li, k) => li.classList.toggle('on', k <= 1));
-}
-$('googleBtn').addEventListener('click', async () => {
-  const note = $('payNote');
-  try {
-    if (!currentAccount()) {
-      try {
-        sessionStorage.setItem(PENDING, JSON.stringify({ item: payItem, plan: payPlan }));
-      } catch {}
-      $('paywall').close(); // Clerk's sign-in window opens on top of the page
-      await signInWithGoogle();
-      sessionStorage.removeItem(PENDING);
-      openPaywall(payItem);
-    }
-    // signed in: the next stop is checkout, which isn't connected yet
-    signedInNote();
-  } catch (err) {
-    note.textContent = err.message === 'setup' ? 'Google sign-in and checkout are being connected and open very soon. Until then you can try every world here for free.' : err.message;
-    note.classList.add('pay-warn');
-  }
-});
-if (!signInAvailable()) $('googleBtn').title = 'Opening soon';
-// the account button in the top-left card: Sign in, or Clerk's avatar menu once signed in
-let accountShown = '';
-function syncAccountButton(a) {
-  const id = a?.id || '';
-  if (id === accountShown) return;
-  accountShown = id;
-  const slot = $('account');
-  if (a) {
-    slot.innerHTML = '';
-    mountAccountButton(slot);
-  } else {
-    slot.innerHTML = '<button type="button" class="signin-btn" id="signInBtn">Sign in</button>';
-  }
-}
-$('account').addEventListener('click', (e) => {
-  if (!e.target.closest('#signInBtn')) return;
-  if (!signInAvailable()) return showStep(1, 'Accounts open very soon. Everything here works without one for now.');
-  signInWithGoogle().catch(() => {});
-});
-// What plan you're on, always in view: "Free · Upgrade", or a gold PRO.
-function syncPlan() {
-  const chip = $('planChip');
-  const pro = owns('pro');
-  chip.hidden = !currentAccount();
-  chip.toggleAttribute('data-pro', pro);
-  chip.innerHTML = pro ? '✦ PRO' : 'Free · <b>Upgrade</b>';
-  chip.title = pro ? 'You have every Pro world' : 'See what Pro unlocks';
-  for (const b of $('styles').children) {
-    const tag = b.querySelector('small');
-    if (tag) tag.textContent = owns(b.dataset.style) ? '✓ YOURS' : 'PRO';
-  }
-}
-$('planChip').addEventListener('click', () => !owns('pro') && openPaywall('pro'));
-onAccountChange((a) => {
-  syncPlan();
-  syncAccountButton(a);
-  // back from Google with a paywall to finish: open it again where they left off
-  let pending = null;
-  try {
-    pending = JSON.parse(sessionStorage.getItem(PENDING) || 'null');
-  } catch {}
-  if (a && pending && !$('paywall').open) {
-    sessionStorage.removeItem(PENDING);
-    payPlan = pending.plan || payPlan;
-    openPaywall(pending.item);
-    signedInNote();
-  }
-});
 startTracking();
-startAccounts();
-
-// a purchase lands (the server updates the account): close the paywall and carry on
-onAccountChange(() => {
-  if (!$('paywall').open || !owns(payItem)) return;
-  $('paywall').close();
-  if (payItem === 'song') $('downloadSong').click();
-  else setDrawer(true);
-});

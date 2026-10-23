@@ -20,7 +20,6 @@ flowchart LR
   subgraph Server[Vercel Functions]
     H["/api/heatmap (SVG)"]
     J["/api/contributions (JSON)"]
-    K["/api/embed-check"]
   end
   subgraph Data["api/_contributions.js"]
     M1[1. Instance memory]
@@ -29,16 +28,16 @@ flowchart LR
   end
   GH[(GitHub GraphQL<br/>with GITHUB_TOKEN)]
   BK[(Public scraper<br/>backup)]
-  DB[(Neon Postgres)]
+  DB[(Neon Postgres<br/>analytics only)]
 
   R --> C --> CDN
   W --> CDN
   S --> CDN
   CDN --> H & J
-  W -. Pro worlds .-> K --> DB
   H & J --> M1 --> M2 --> M3
   M3 --> GH
   M3 -. if GitHub fails .-> BK
+  H -. render counts .-> DB
 ```
 
 | Layer | What it keeps | How long |
@@ -67,7 +66,7 @@ Every result is padded to the full year (Jan 1 to Dec 31), so both sources look 
 | Thousands of random usernames | Names that can't be GitHub usernames are rejected without a lookup. Unknown users are remembered for an hour. Each IP gets 30 uncached lookups a minute per instance (cached ones are unlimited). |
 | A large, spread-out attack | The per-IP limit is per instance, not global. Add a **Vercel Firewall rate-limit rule** on `/api/*` for a hard limit. |
 | Quota runs short at very high scale | Past years cost nothing after the first fetch. Past ~5,000 distinct users an hour, extra lookups use the scraper or get the last copy. Next steps: a second token, or refresh this year every 3 hours. |
-| Database is slow or down | Only Pro embeds ask it (`/api/embed-check`, cached 5 minutes per key). If it fails, the embed shows the free City instead of breaking. |
+| Database is slow or down | Heatmaps never need it. Only analytics and the admin page use it, and a failed analytics write never affects the page. |
 
 ## Capacity, roughly
 

@@ -10,25 +10,6 @@ const params = new URLSearchParams(location.search);
 const opts = parseOptions(params);
 const $ = (id) => document.getElementById(id);
 
-// Pro worlds (and hiding the badge) need a key from a paid account, checked by our server
-// on every load. Without one the embed shows the free City with a small note instead.
-const pro = STYLES[getStyle(opts.style)].pro;
-let unlocked = false;
-if (pro || !opts.badge) {
-  try {
-    const item = pro ? getStyle(opts.style) : 'pro';
-    const res = await fetch(`/api/embed-check?${new URLSearchParams({ item, key: opts.key })}`);
-    unlocked = res.ok && (await res.json()).ok;
-  } catch {}
-  if (!unlocked) {
-    if (pro) {
-      opts.style = 'city';
-      $('locked').hidden = false;
-    }
-    opts.badge = true;
-  }
-}
-
 const theme = THEMES[STYLES[getStyle(opts.style)].theme || getTheme(opts.theme)];
 
 if (!opts.transparent) document.body.style.background = theme.background;
@@ -36,7 +17,7 @@ $('message').style.color = theme.text;
 
 // an embed's page view says which site it's on (the iframe's referrer is the host page)
 startTracking({ embed: true });
-track('embed_view', { user: opts.user.toLowerCase(), style: opts.style, pro, unlocked });
+track('embed_view', { user: opts.user.toLowerCase(), style: getStyle(opts.style) });
 
 const map = createHeatmap($('map'), opts);
 if (import.meta.env.DEV) window.__heatmap = map; // for debugging and capturing previews

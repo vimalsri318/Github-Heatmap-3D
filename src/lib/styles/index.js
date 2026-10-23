@@ -10,7 +10,6 @@ import { createForest, FOREST_PALETTES } from './forest.js';
 export const STYLES = {
   city: {
     name: 'City',
-    pro: false,
     theme: null,
     create: (ctx) => createCity(ctx),
     camera: { dir: [-18, 32, 52], dist: 64, boardWidth: 53 }, // boardWidth: width of the grid, for the intro
@@ -18,7 +17,6 @@ export const STYLES = {
   },
   night: {
     name: 'Night City',
-    pro: true,
     theme: 'night',
     create: createNightCity,
     camera: { dir: [-42, 20, 40], dist: 50, halfWidth: 26, boardWidth: 69 }, // diagonal, down the avenues
@@ -29,7 +27,6 @@ export const STYLES = {
   },
   galaxy: {
     name: 'Galaxy',
-    pro: true,
     theme: 'galaxy',
     create: createGalaxy,
     camera: { dir: [0, 34, 42], dist: 80, halfWidth: 44, boardWidth: 70 },
@@ -40,7 +37,6 @@ export const STYLES = {
   },
   forest: {
     name: 'Forest',
-    pro: true,
     theme: 'grove',
     create: createForest,
     palettes: FOREST_PALETTES, // leaf colors, picked like themes
