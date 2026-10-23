@@ -38,7 +38,7 @@ The site has a landing page (`/`) that shows everything off, and the **Studio** 
 |---|---|
 | **Website** (iframe) | Fully interactive 3D |
 | **Script** tag | Fully interactive 3D; options are editable `data-*` attributes |
-| **README** | A 3D-style image (GitHub READMEs can't run scripts) that links to the interactive version |
+| **README** | An animated 3D-style image (GitHub READMEs can't run scripts, so the animation lives inside the SVG) that links to the interactive version |
 | **Link** | A shareable link to your exact view |
 
 ### Website
@@ -59,8 +59,10 @@ The site has a landing page (`/`) that shows everything off, and the **Studio** 
 ### GitHub README
 
 ```md
-[![My contributions in 3D](https://YOUR-SITE/api/heatmap?user=octocat&theme=sand)](https://YOUR-SITE/?user=octocat)
+[![My contributions in 3D](https://YOUR-SITE/api/heatmap?user=octocat&theme=sand&animate=grow)](https://YOUR-SITE/?user=octocat)
 ```
+
+`animate=grow` makes the bars rise in a wave from January to December, then a soft light sweeps across them. `animate=loop` rises, holds and falls on repeat. Leave it out for a still image. The animation is SVG's own (SMIL), so it plays in any `<img>`: GitHub, GitLab, Notion, docs sites.
 
 ## Options
 
@@ -69,6 +71,7 @@ The same names work as URL params (`?autoRotate=0`), script attributes (`data-au
 | Option | Default | Description |
 |---|---|---|
 | `user` | – | GitHub username (sample data when empty) |
+| `animate` | `0` | README image only: `grow` (rise once), `loop` (rise and fall on repeat), `0` (still) |
 | `demo` | `0` | Show the built-in demo year (every month filled) instead of fetching `user` |
 | `year` | current year | 2008 to now |
 | `style` | `city` | `city`, `night`, `galaxy`, `forest` |
@@ -130,3 +133,18 @@ src/lib/data.js             contribution data + stats
 Contributions come from the public [github-contributions-api](https://github.com/grubersjoe/github-contributions-api), which reads public profile calendars (no token needed). Private contributions only appear if the user has turned on "Include private contributions" on their GitHub profile.
 
 Built with [Three.js](https://threejs.org) and [Vite](https://vite.dev). Forest trees are generated with [EZ-Tree](https://github.com/dgreenheck/ez-tree) by Daniel Greenheck (MIT); its bark textures come from [Poly Haven](https://polyhaven.com) and [TextureCan](https://www.texturecan.com) (CC0).
+
+## How it stays up under load
+
+Every heatmap (README image, iframe, script embed, Studio) gets its data from `/api/contributions`, never straight from GitHub. One user's year is fetched once and shared:
+
+1. **CDN / GitHub's image proxy** cache the finished response (an hour for this year, a week for past years, and stale copies keep being served while they refresh).
+2. **Instance memory**, then **Vercel Runtime Cache** shared by all instances.
+3. Only then **GitHub**: the official GraphQL API when `GITHUB_TOKEN` is set, with the public scraper as backup. However many requests ask at once, it's one fetch per user and year.
+
+If GitHub is down or rate limited, the last copy is served instead of an error. Unknown usernames are rejected or remembered, and each visitor gets 30 uncached lookups a minute (cached ones are unlimited). For a hard global limit, add a Vercel Firewall rate-limit rule on `/api/*`.
+
+```bash
+npm test                                             # unit tests (animation + caching)
+npm run load-test -- https://YOUR-SITE --requests 1000 --concurrency 100
+```
