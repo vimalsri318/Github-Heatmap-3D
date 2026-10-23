@@ -30,7 +30,7 @@ Files in `db/migrations/` run in name order, once each, recorded in `schema_migr
 ## Checking a deployment by hand
 
 ```bash
-node scripts/smoke-test.js https://github-heatmap-3d.vercel.app
+node scripts/smoke-test.js https://heatmap3d.thoughtlatch.com
 ```
 
 ## Rolling back

@@ -3,7 +3,7 @@
 import { createClerkClient, verifyToken } from '@clerk/backend';
 
 // Pages allowed to use a session token here (Clerk checks the token's "azp").
-const ORIGINS = ['https://github-heatmap-3d.vercel.app', 'http://localhost:5173', 'http://localhost:5174', ...(process.env.SITE_ORIGINS || '').split(',').filter(Boolean)];
+const ORIGINS = ['https://heatmap3d.thoughtlatch.com', 'https://github-heatmap-3d.vercel.app', 'http://localhost:5173', 'http://localhost:5174', ...(process.env.SITE_ORIGINS || '').split(',').filter(Boolean)];
 
 export async function userIdFrom(req) {
   const header = req.headers.authorization || '';

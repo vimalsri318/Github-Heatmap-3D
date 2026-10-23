@@ -107,7 +107,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://github-heatmap-3d.vercel.app
+      url: https://heatmap3d.thoughtlatch.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -124,8 +124,10 @@ jobs:
         # leaves Vercel. A failed migration fails the build, and the live site stays as it was.
         run: echo "url=$(npx vercel@50 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
       - name: Smoke test the live site
-        # the public address, which --prod has just pointed at the new deployment
-        run: node scripts/smoke-test.js https://github-heatmap-3d.vercel.app
+        # the public addresses, which --prod has just pointed at the new deployment
+        run: |
+          node scripts/smoke-test.js https://heatmap3d.thoughtlatch.com
+          node scripts/smoke-test.js https://github-heatmap-3d.vercel.app
       - name: Show the logs if the smoke test failed
         if: failure()
         run: npx vercel@50 logs "${{ steps.deploy.outputs.url }}" --token=${{ secrets.VERCEL_TOKEN }} || true

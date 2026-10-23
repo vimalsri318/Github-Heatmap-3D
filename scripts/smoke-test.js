@@ -1,5 +1,5 @@
 // Checks a deployment works end to end. CI runs it after every deploy; run it yourself with:
-//   node scripts/smoke-test.js https://github-heatmap-3d.vercel.app
+//   node scripts/smoke-test.js https://heatmap3d.thoughtlatch.com
 // Exits non-zero if anything is wrong, printing what failed.
 const base = (process.argv[2] || process.env.SMOKE_URL || '').replace(/\/$/, '');
 if (!/^https?:\/\//.test(base)) {

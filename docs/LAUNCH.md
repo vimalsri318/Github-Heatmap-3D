@@ -2,7 +2,7 @@
 
 Drafts for announcing GitHub Heatmap 3D. Edit them into your own voice before posting; posts that sound personal do much better than polished ones.
 
-- Site: https://github-heatmap-3d.vercel.app
+- Site: https://heatmap3d.thoughtlatch.com
 - Code: https://github.com/vimalsri318/Github-Heatmap-3D
 - Add `?utm_source=<site>` to links (for example `?utm_source=linkedin`) so the admin page's **Campaigns** list shows which post brought people in.
 
@@ -22,7 +22,7 @@ Drafts for announcing GitHub Heatmap 3D. Edit them into your own voice before po
 > Every day is a building, as tall as what I shipped that day. You can spin it, switch it to a night city, a galaxy or a forest, hear your year as a song, and put it on your website or GitHub README. The README version is an animated SVG, so the bars rise right on your profile with no GIF or script.
 >
 > It's free and open source. Try it with your username:
-> https://github-heatmap-3d.vercel.app?utm_source=linkedin
+> https://heatmap3d.thoughtlatch.com?utm_source=linkedin
 >
 > Built with Three.js and Vercel Functions. The part I enjoyed most was making it hold up under traffic: however many people view a profile, GitHub is asked at most once an hour.
 >
@@ -42,7 +42,7 @@ Each subreddit has its own self-promotion rules; read them first. Post as yourse
 >
 > You can embed it on a website (iframe or script tag) or put it in your GitHub README. GitHub READMEs can't run scripts, so the README version is an SVG with the animation built in: the bars rise in a wave from January to December.
 >
-> Free, no sign-up, open source (MIT): https://github-heatmap-3d.vercel.app?utm_source=reddit
+> Free, no sign-up, open source (MIT): https://heatmap3d.thoughtlatch.com?utm_source=reddit
 >
 > Code: https://github.com/vimalsri318/Github-Heatmap-3D
 >
