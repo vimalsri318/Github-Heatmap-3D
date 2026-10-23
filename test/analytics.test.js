@@ -41,10 +41,12 @@ const call = async (handler, req) => {
 test('tracking and the admin numbers, end to end', { skip: !url && 'set TEST_DATABASE_URL to run' }, async () => {
   process.env.DATABASE_URL = url;
   const { db } = await import('../api/_db.js');
+  process.env.OBSERVE_QUIET = '1';
   await db().query('delete from events; delete from daily_counts');
   const { default: track } = await import('../api/track.js');
   const { collectStats } = await import('../api/admin-stats.js');
   const { bump } = await import('../api/_analytics.js');
+  const { count, flushMetrics } = await import('../api/_observe.js');
 
   const session = 'abc123';
   let r = await call(track, post({ session, events: [
@@ -74,6 +76,12 @@ test('tracking and the admin numbers, end to end', { skip: !url && 'set TEST_DAT
   await bump('image_render', 'octocat|3d|grow|github', 3);
   await bump('image_render', 'octocat|3d|grow|github', 2);
 
+  count('api_requests', 'heatmap|200', 9);
+  count('api_requests', 'heatmap|500', 1);
+  count('api_latency', 'heatmap|100', 10);
+  count('upstream', 'fromGitHub|ok', 2);
+  await flushMetrics();
+
   const { rows } = await db().query('select name, props from events order by id');
   assert.equal(rows.length, 8); // 6 good + 2 embed; the bad name and the bot were dropped
   assert.ok(rows.every((x) => !JSON.stringify(x).includes('203.0.113.7')), 'no IP stored');
@@ -94,5 +102,10 @@ test('tracking and the admin numbers, end to end', { skip: !url && 'set TEST_DAT
   assert.equal(s.daily.at(-1).visitors, 1);
   assert.equal(s.countries[0].key, 'IN');
   assert.ok(s.clicks.some((c) => c.key === 'Share & embed'));
+  const heat = s.api.find((r) => r.route === 'heatmap');
+  assert.ok(heat.requests >= 10 && heat.errors >= 1, JSON.stringify(heat));
+  assert.ok(s.upstream.some((u) => u.key === 'fromGitHub|ok'));
+  assert.ok(s.latency.some((l) => l.route === 'heatmap' && l.bucket === '100'));
+  assert.ok(s.daily.at(-1).api >= 10);
   await db().end();
 });

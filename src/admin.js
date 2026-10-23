@@ -86,13 +86,14 @@ function render() {
   renderChart();
   renderFunnel();
   renderLists();
+  renderHealth();
   renderLive();
   $('foot').textContent = `Updated ${new Date(data.generatedAt).toLocaleTimeString()} · refreshes every minute · visitors are counted once a day, without cookies`;
 }
 
 function renderTiles() {
   const t = data.totals;
-  const revenue = data.revenue.length ? data.revenue.map((r) => `${(r.minor / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })} ${r.currency || ''}`).join(' · ') : '0';
+  const api = data.api.reduce((a, r) => ({ requests: a.requests + r.requests, errors: a.errors + r.errors }), { requests: 0, errors: 0 });
   const tiles = [
     [fmt(t.visitors), 'Visitors', `${fmt(t.visits)} visits`],
     [fmt(t.views), 'Page views', `${t.visits ? (t.views / t.visits).toFixed(1) : 0} per visit`],
@@ -101,12 +102,19 @@ function renderTiles() {
     [fmt(t.embed_views), 'Embed views', `on ${fmt(t.embed_sites)} other sites`],
     [fmt(data.renders.total), 'README image renders', `${fmt(data.renders.github)} via GitHub`],
     [fmt(data.signups.recent), 'New accounts', `${fmt(data.signups.total)} in total`],
-    [revenue, 'Revenue', `${fmt(data.revenue.reduce((s, r) => s + r.n, 0))} payments`],
+    [fmt(api.requests), 'API requests', `${api.requests ? ((api.errors / api.requests) * 100).toFixed(2) : '0.00'}% server errors`],
   ];
   $('tiles').innerHTML = tiles.map(([n, label, sub]) => `<div class="tile"><span>${label}</span><b>${n}</b><small>${sub}</small></div>`).join('');
 }
 
-const METRICS = { visitors: 'Visitors per day', views: 'Page views per day', embeds: 'Embed views on other sites, per day', renders: 'README image renders per day' };
+const METRICS = {
+  visitors: 'Visitors per day',
+  views: 'Page views per day',
+  embeds: 'Embed views on other sites, per day',
+  renders: 'README image renders per day',
+  api: 'API requests per day (that reached our functions)',
+  api_errors: 'API server errors per day',
+};
 
 /** A "nice" axis top: 1, 2 or 5 times a power of ten, at or above `max`. */
 function niceMax(max) {
@@ -155,14 +163,14 @@ function renderChart() {
     tip.hidden = false;
     tip.style.left = `${box.left - host.left + box.width / 2}px`;
     tip.style.top = `${y(r[metric]) * (host.height / H)}px`;
-    tip.innerHTML = `${r.day} · <b>${fmt(r[metric])}</b> ${metric === 'renders' ? 'renders' : metric}`;
+    tip.innerHTML = `${r.day} · <b>${fmt(r[metric])}</b> ${{ renders: 'renders', api: 'requests', api_errors: 'errors' }[metric] || metric}`;
   });
   svgEl.addEventListener('mouseleave', () => {
     tip.hidden = true;
     svgEl.querySelector('.bar.on')?.classList.remove('on');
   });
-  $('chartTable').innerHTML = `<div class="scroll"><table><tr><th>Day</th><th>Visitors</th><th>Page views</th><th>Embed views</th><th>README renders</th></tr>${rows
-    .map((r) => `<tr><td>${r.day}</td><td class="num">${fmt(r.visitors)}</td><td class="num">${fmt(r.views)}</td><td class="num">${fmt(r.embeds)}</td><td class="num">${fmt(r.renders)}</td></tr>`)
+  $('chartTable').innerHTML = `<div class="scroll"><table><tr><th>Day</th><th>Visitors</th><th>Page views</th><th>Embed views</th><th>README renders</th><th>API requests</th><th>API errors</th></tr>${rows
+    .map((r) => `<tr><td>${r.day}</td><td class="num">${fmt(r.visitors)}</td><td class="num">${fmt(r.views)}</td><td class="num">${fmt(r.embeds)}</td><td class="num">${fmt(r.renders)}</td><td class="num">${fmt(r.api)}</td><td class="num">${fmt(r.api_errors)}</td></tr>`)
     .join('')}</table></div>`;
 }
 
@@ -209,7 +217,6 @@ function renderLists() {
     list('README images', 'Renders per GitHub user (views are higher: GitHub caches them)', d.readmeUsers, { label: (r) => `@${r.key}` }),
     list('Code copied for', 'Where people put it', d.copies, { label: (r) => ({ website: 'Website (iframe)', script: 'Website (script)', readme: 'GitHub README', link: 'Link' })[r.key] || r.key }),
     list('Worlds', 'Styles loaded, embedded or copied', d.worlds),
-    list('Paywall opened for', 'Times the unlock dialog opened', d.paywall),
     list('Links out', 'Clicks to other websites', d.outbound),
     list('Campaigns', 'Visitors by utm_source', d.campaigns),
     list('Countries', 'Visitors', d.countries, { label: (r) => COUNTRY(r.key) }),
@@ -223,6 +230,42 @@ function describe(e) {
   if (e.name === 'click') return `“${p.label}”${p.out ? ` → ${p.out}` : ''}`;
   if (e.name === 'pageview') return [e.referrer && `from ${e.referrer}`, p.source && `utm ${p.source}`, p.embed && 'embed'].filter(Boolean).join(' · ');
   return Object.entries(p).map(([k, v]) => `${k}: ${v}`).join(' · ');
+}
+
+// Latency percentiles from the bucket counts: "p95 ≤ 250 ms" means 95% finished within 250 ms.
+const BUCKETS = ['50', '100', '250', '500', '1000', '2500', '5000', 'slow'];
+function percentile(route, p) {
+  const rows = data.latency.filter((r) => r.route === route);
+  const total = rows.reduce((s, r) => s + r.n, 0);
+  if (!total) return '–';
+  let seen = 0;
+  for (const b of BUCKETS) {
+    seen += rows.find((r) => r.bucket === b)?.n || 0;
+    if (seen / total >= p) return b === 'slow' ? '> 5 s' : `≤ ${Number(b) >= 1000 ? `${Number(b) / 1000} s` : `${b} ms`}`;
+  }
+  return '–';
+}
+
+const SOURCE_NAMES = { memory: 'Instance memory', shared: 'Shared cache', upstream: 'Fetched from GitHub', joined: 'Waited on a fetch', stale: 'Old copy (source down)', sample: 'Sample data', not_found: 'Unknown user', failed: 'Failed' };
+const PROTECTION_NAMES = { invalid_username: 'Invalid usernames refused', lookup_rate_limited: 'New lookups rate limited', served_stale: 'Old copy served (GitHub failed)', track_rate_limited: 'Analytics batches refused' };
+
+function renderHealth() {
+  const routes = data.api;
+  const rows = routes
+    .map((r) => {
+      const rate = r.requests ? (r.errors / r.requests) * 100 : 0;
+      return `<tr><td>/api/${esc(r.route.replace('_', '-'))}</td><td class="num">${fmt(r.requests)}</td><td class="num${rate >= 1 ? ' bad' : ''}">${rate.toFixed(2)}%</td><td class="num">${fmt(r.client_errors)}</td><td class="num">${percentile(r.route, 0.5)}</td><td class="num">${percentile(r.route, 0.95)}</td></tr>`;
+    })
+    .join('');
+  $('health').innerHTML = routes.length
+    ? `<div class="scroll"><table><tr><th>Endpoint</th><th>Requests</th><th>Server errors</th><th>4xx</th><th>p50</th><th>p95</th></tr>${rows}</table></div>`
+    : '<p class="empty">No API traffic recorded in this range yet.</p>';
+  $('healthLists').innerHTML = [
+    list('Where the data came from', 'Answered by each layer (CDN hits never reach us, so they aren’t here)', data.dataSources, { label: (r) => SOURCE_NAMES[r.key] || r.key }),
+    list('GitHub and backup', 'Upstream fetches by source and result', data.upstream, { label: (r) => { const [src, out] = r.key.split('|'); return `${src === 'fromGitHub' ? 'GitHub API' : 'Public scraper'} · ${out.replace('_', ' ')}`; } }),
+    list('Protection', 'Abuse and failure handling that kicked in', data.protection, { label: (r) => PROTECTION_NAMES[r.key] || r.key }),
+    list('Browser errors', 'JavaScript errors visitors hit', data.clientErrors, { sub: (r) => `${r.page || ''} ${r.where_at || ''}` }),
+  ].join('');
 }
 
 function renderLive() {

@@ -3,24 +3,27 @@
 // instead of each browser asking the upstream source itself.
 import { getContributions, cacheHeader, clientIp, NotFound, TooMany } from './_contributions.js';
 import { OPTIONS } from '../src/lib/options.js';
+import { observe } from './_observe.js';
 
-export default async function handler(req, res) {
+export default observe('contributions', async (req, res, ctx) => {
   const q = new URL(req.url, 'http://x').searchParams;
   const { min, max } = OPTIONS.year;
   const year = Math.min(max, Math.max(min, Number(q.get('year')) || max));
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
-    const { days, source } = await getContributions(q.get('user'), year, { ip: clientIp(req) });
+    const { days, source } = await ctx.span('data', () => getContributions(q.get('user'), year, { ip: clientIp(req) }));
+    Object.assign(ctx.fields, { source, user: q.get('user'), year });
     res.setHeader('Cache-Control', cacheHeader(year, source));
     res.setHeader('X-Data-Source', source);
     res.statusCode = 200;
     res.end(JSON.stringify(days));
   } catch (err) {
     const status = err instanceof NotFound ? 404 : err instanceof TooMany ? 429 : 502;
+    Object.assign(ctx.fields, { user: q.get('user'), year, error: err.message });
     res.setHeader('Cache-Control', status === 404 ? 'public, max-age=600, s-maxage=3600' : 'no-store');
     if (status === 429) res.setHeader('Retry-After', '60');
     res.statusCode = status;
-    res.end(JSON.stringify({ error: err.message }));
+    res.end(JSON.stringify({ error: err.message, requestId: ctx.requestId }));
   }
-}
+});

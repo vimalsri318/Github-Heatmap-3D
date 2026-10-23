@@ -8,6 +8,7 @@
 // Past years never change, so they're kept for a week. This year is refreshed hourly, and when
 // the source is down or rate limited we keep serving the last copy instead of failing.
 import { getCache } from '@vercel/functions';
+import { log, count } from './_observe.js';
 
 const JOGRUBER = 'https://github-contributions-api.jogruber.de/v4';
 const GITHUB_GRAPHQL = 'https://api.github.com/graphql';
@@ -50,7 +51,7 @@ async function sharedGet(key) {
   try {
     return (await sharedCache()?.get(key)) ?? null;
   } catch (err) {
-    console.warn('contributions: cache read failed', err.message);
+    log('warn', 'shared cache read failed', { error: err.message });
     return null;
   }
 }
@@ -58,7 +59,7 @@ async function sharedSet(key, entry) {
   try {
     await sharedCache()?.set(key, entry, { ttl: KEEP, tags: [`user:${key.split(':')[0]}`] });
   } catch (err) {
-    console.warn('contributions: cache write failed', err.message);
+    log('warn', 'shared cache write failed', { error: err.message });
   }
 }
 
@@ -110,12 +111,20 @@ async function fetchFresh(user, year) {
   const sources = process.env.GITHUB_TOKEN ? [fromGitHub, fromJogruber] : [fromJogruber];
   let lastError;
   for (const source of sources) {
+    const t = performance.now();
     try {
-      return fullYear(await source(user, year), year);
+      const days = fullYear(await source(user, year), year);
+      count('upstream', `${source.name}|ok`);
+      log('info', 'upstream fetch', { source: source.name, user, year, ms: Math.round(performance.now() - t) });
+      return days;
     } catch (err) {
-      if (err instanceof NotFound) throw err;
+      if (err instanceof NotFound) {
+        count('upstream', `${source.name}|not_found`);
+        throw err;
+      }
       lastError = err;
-      console.warn(`contributions: ${source.name} failed for ${user}/${year}:`, err.message);
+      count('upstream', `${source.name}|error`);
+      log('warn', 'upstream fetch failed', { source: source.name, user, year, ms: Math.round(performance.now() - t), error: err.message });
     }
   }
   throw lastError;
@@ -158,7 +167,10 @@ function allowMiss(ip) {
  * Throws NotFound for unknown users and TooMany when this visitor made too many new lookups.
  */
 export async function getContributions(user, year, { ip } = {}) {
-  if (!isUsername(user)) throw new NotFound(`"${String(user).slice(0, 40)}" isn't a GitHub username`);
+  if (!isUsername(user)) {
+    count('protection', 'invalid_username');
+    throw new NotFound(`"${String(user).slice(0, 40)}" isn't a GitHub username`);
+  }
   const key = `${user.toLowerCase()}:${year}`;
   const fresh = (e) => e?.days && now() - e.fetchedAt < freshFor(year);
 
@@ -178,6 +190,8 @@ export async function getContributions(user, year, { ip } = {}) {
   const joined = Boolean(pending);
   if (!pending) {
     if (!allowMiss(ip)) {
+      count('protection', 'lookup_rate_limited');
+      log('warn', 'uncached lookups rate limited', { user, year });
       if (entry?.days) return { ...entry, source: 'stale' };
       throw new TooMany('Too many new lookups, try again in a minute');
     }
@@ -205,7 +219,11 @@ export async function getContributions(user, year, { ip } = {}) {
   try {
     return { ...(await pending), source: joined ? 'joined' : 'upstream' };
   } catch (err) {
-    if (entry?.days && !(err instanceof NotFound)) return { ...entry, source: 'stale' };
+    if (entry?.days && !(err instanceof NotFound)) {
+      count('protection', 'served_stale');
+      log('warn', 'served a stale copy', { user, year, age_s: now() - entry.fetchedAt, error: err.message });
+      return { ...entry, source: 'stale' };
+    }
     throw err;
   }
 }

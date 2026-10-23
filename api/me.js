@@ -3,6 +3,7 @@
 // into our own users table, so our data never depends on the sign-in provider.
 import { db } from './_db.js';
 import { userIdFrom, clerk } from './_auth.js';
+import { observe, log } from './_observe.js';
 
 const send = (res, status, body) => {
   res.statusCode = status;
@@ -11,7 +12,7 @@ const send = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
-export default async function handler(req, res) {
+export default observe('me', async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { error: 'Use GET' });
   const id = await userIdFrom(req);
   if (!id) return send(res, 401, { error: 'Not signed in' });
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
     const owned = await pool.query('select item from entitlements where user_id = $1 and (expires_at is null or expires_at > now())', [id]);
     send(res, 200, { id, email: user.email, name: user.name, entitlements: owned.rows.map((r) => r.item) });
   } catch (err) {
-    console.error('api/me', err);
+    log('error', 'api/me', { error: err.message });
     send(res, 500, { error: 'Could not load your account' });
   }
-}
+});

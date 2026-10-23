@@ -36,6 +36,8 @@
               <button type="button" role="radio" data-metric="views" aria-checked="false">Page views</button>
               <button type="button" role="radio" data-metric="embeds" aria-checked="false">Embed views</button>
               <button type="button" role="radio" data-metric="renders" aria-checked="false">README renders</button>
+              <button type="button" role="radio" data-metric="api" aria-checked="false">API requests</button>
+              <button type="button" role="radio" data-metric="api_errors" aria-checked="false">API errors</button>
             </div>
           </div>
           <div class="chart" id="chart"></div>
@@ -49,6 +51,13 @@
         </section>
 
         <div class="grid" id="lists"></div>
+
+        <section class="panel">
+          <h2>API health</h2>
+          <p class="hint">Requests that reached our functions, per endpoint. Each request is also logged as one JSON line with its request and trace ids (see docs/OBSERVABILITY.md).</p>
+          <div id="health"></div>
+        </section>
+        <div class="grid" id="healthLists"></div>
 
         <section class="panel">
           <h2>Latest activity</h2>

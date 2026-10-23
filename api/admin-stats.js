@@ -2,6 +2,7 @@
 // the Clerk account's email must be listed in ADMIN_EMAILS (comma-separated).
 import { db } from './_db.js';
 import { userIdFrom, clerk } from './_auth.js';
+import { observe, log } from './_observe.js';
 
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 const emailCache = new Map();
@@ -29,13 +30,16 @@ const SITE = `name = 'pageview' and coalesce(props->>'embed', 'false') <> 'true'
 const QUERIES = {
   daily: `select to_char(d, 'YYYY-MM-DD') as day,
             coalesce(e.visitors, 0)::int as visitors, coalesce(e.views, 0)::int as views,
-            coalesce(e.embeds, 0)::int as embeds, coalesce(r.renders, 0)::int as renders
+            coalesce(e.embeds, 0)::int as embeds, coalesce(r.renders, 0)::int as renders,
+            coalesce(a.api, 0)::int as api, coalesce(a.api_errors, 0)::int as api_errors
           from generate_series(current_date - ($1::int - 1), current_date, interval '1 day') d
           left join (select at::date as day, count(distinct visitor) filter (where ${SITE}) as visitors,
                        count(*) filter (where ${SITE}) as views,
                        count(*) filter (where name = 'embed_view' and referrer is not null) as embeds
                      from events where at >= current_date - ($1::int - 1) group by 1) e on e.day = d::date
           left join (select day, sum(n) as renders from daily_counts where kind = 'image_render' and day >= current_date - ($1::int - 1) group by 1) r on r.day = d::date
+          left join (select day, sum(n) as api, coalesce(sum(n) filter (where split_part(key, '|', 2)::int >= 500), 0) as api_errors
+                     from daily_counts where kind = 'api_requests' and day >= current_date - ($1::int - 1) group by 1) a on a.day = d::date
           order by d`,
   totals: `select count(distinct (visitor, at::date)) filter (where ${SITE})::int as visitors,
              count(distinct session) filter (where ${SITE})::int as visits,
@@ -91,16 +95,25 @@ const QUERIES = {
            where name = 'copy_code' and at >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
   worlds: `select coalesce(props->>'style', 'city') as key, count(*)::int as n from events
            where name in ('load_user', 'embed_view', 'copy_code') and at >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
-  paywall: `select coalesce(props->>'item', '?') as key, count(*)::int as n from events
-            where name = 'paywall_open' and at >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
   countries: `select coalesce(country, '??') as key, count(distinct visitor)::int as n from events
               where ${SITE} and at >= current_date - ($1::int - 1) group by 1 order by 2 desc limit 10`,
   devices: `select coalesce(device, '?') as key, count(distinct visitor)::int as n from events
             where ${SITE} and at >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
   signups: `select count(*)::int as total, count(*) filter (where created_at >= current_date - ($1::int - 1))::int as recent from users`,
   newUsers: `select email, name, to_char(created_at, 'YYYY-MM-DD HH24:MI') as at from users order by created_at desc limit 10`,
-  revenue: `select currency, count(*)::int as n, coalesce(sum(amount_minor), 0)::bigint as minor from purchases
-            where status in ('paid', 'active') and created_at >= current_date - ($1::int - 1) group by 1`,
+  // ---- API health, from the counters api/_observe.js keeps ----
+  api: `select split_part(key, '|', 1) as route, sum(n)::int as requests,
+          coalesce(sum(n) filter (where split_part(key, '|', 2)::int >= 500), 0)::int as errors,
+          coalesce(sum(n) filter (where split_part(key, '|', 2)::int between 400 and 499), 0)::int as client_errors
+        from daily_counts where kind = 'api_requests' and day >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
+  latency: `select split_part(key, '|', 1) as route, split_part(key, '|', 2) as bucket, sum(n)::int as n
+            from daily_counts where kind = 'api_latency' and day >= current_date - ($1::int - 1) group by 1, 2`,
+  upstream: `select key, sum(n)::int as n from daily_counts where kind = 'upstream' and day >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
+  dataSources: `select split_part(key, '|', 2) as key, sum(n)::int as n from daily_counts
+                where kind = 'data_source' and day >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
+  protection: `select key, sum(n)::int as n from daily_counts where kind = 'protection' and day >= current_date - ($1::int - 1) group by 1 order by 2 desc`,
+  clientErrors: `select props->>'message' as key, max(page) as page, max(props->>'where') as where_at, count(*)::int as n
+                 from events where name = 'client_error' and at >= current_date - ($1::int - 1) group by 1 order by 4 desc limit 10`,
   live: `select to_char(at, 'YYYY-MM-DD HH24:MI:SS') as at, name, page, referrer, country, device, props
          from events order by at desc limit 40`,
 };
@@ -118,14 +131,14 @@ export async function collectStats(days) {
   return { days, generatedAt: new Date().toISOString(), ...Object.fromEntries(entries) };
 }
 
-export default async function handler(req, res) {
+export default observe('admin_stats', async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { error: 'Use GET' });
   const id = await userIdFrom(req);
   if (!id) return send(res, 401, { error: 'Sign in to see the admin page' });
   try {
     if (!admins().includes(await emailOf(id))) return send(res, 403, { error: 'This account is not an admin. Add its email to ADMIN_EMAILS.' });
   } catch (err) {
-    console.error('api/admin-stats auth', err);
+    log('error', 'api/admin-stats auth', { error: err.message });
     return send(res, 500, { error: 'Could not check your account' });
   }
 
@@ -133,8 +146,8 @@ export default async function handler(req, res) {
   try {
     send(res, 200, await collectStats(days));
   } catch (err) {
-    console.error('api/admin-stats', err);
+    log('error', 'api/admin-stats', { error: err.message });
     const missing = /relation "(events|daily_counts)" does not exist/.test(err.message);
     send(res, 500, { error: missing ? 'Analytics tables are missing. Run: npm run db:migrate' : 'Could not load the numbers' });
   }
-}
+});

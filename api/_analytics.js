@@ -1,6 +1,7 @@
 // Server side of the analytics: turns a request into anonymous visitor facts and stores events.
 import { createHash } from 'node:crypto';
 import { db } from './_db.js';
+import { log } from './_observe.js';
 
 const BOTS = /bot|crawl|spider|slurp|preview|headless|lighthouse|pingdom|uptime|curl|wget|python|node-fetch|axios|go-http/i;
 export const isBot = (ua = '') => !ua || BOTS.test(ua);
@@ -36,7 +37,7 @@ export async function bump(kind, key, n = 1) {
       [kind, String(key).slice(0, 200), n],
     );
   } catch (err) {
-    console.warn('analytics: count failed', err.message);
+    log('warn', 'analytics: count failed', { error: err.message });
   }
 }
 

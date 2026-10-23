@@ -2,6 +2,7 @@
 // Anonymous: no cookies, and the IP is only used to make a daily visitor hash, never stored.
 import { isBot, device, visitorId, referrerHost, insertEvents } from './_analytics.js';
 import { clientIp } from './_contributions.js';
+import { observe, log, count } from './_observe.js';
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 const MAX_EVENTS = 30;
@@ -37,7 +38,7 @@ async function readBody(req) {
   return JSON.parse(raw);
 }
 
-export default async function handler(req, res) {
+export default observe('track', async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const done = (status) => ((res.statusCode = status), res.end());
   if (req.method !== 'POST') return done(405);
@@ -53,7 +54,10 @@ export default async function handler(req, res) {
   const events = Array.isArray(body?.events) ? body.events.slice(0, MAX_EVENTS) : [];
   const ip = clientIp(req) || 'unknown';
   if (!events.length) return done(204);
-  if (!allow(ip, events.length)) return done(429);
+  if (!allow(ip, events.length)) {
+    count('protection', 'track_rate_limited');
+    return done(429);
+  }
 
   const ownHost = (req.headers.host || '').split(':')[0].replace(/^www\./, '');
   const common = {
@@ -75,7 +79,7 @@ export default async function handler(req, res) {
     await insertEvents(rows);
     done(204);
   } catch (err) {
-    console.error('api/track', err.message);
+    log('error', 'api/track', { error: err.message });
     done(503);
   }
-}
+});

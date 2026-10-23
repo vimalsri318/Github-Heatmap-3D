@@ -98,3 +98,4 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pill { font: 500 11px var(--mono); padding: 2px 7px; border-radius: 99px; background: var(--data-soft); color: var(--ink); }
 .foot { color: var(--faint); font-size: 12px; margin: 0; }
 .error { color: var(--warn); }
+td.bad { color: var(--warn); font-weight: 600; }

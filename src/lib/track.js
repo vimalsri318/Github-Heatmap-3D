@@ -69,6 +69,14 @@ export function startTracking(extra = {}) {
     },
     { capture: true, passive: true },
   );
+  // browser errors, so a broken page shows up in the admin page instead of going unnoticed
+  let reported = 0;
+  const reportError = (message, where) => {
+    if (reported++ >= 5) return; // a looping error shouldn't flood the queue
+    track('client_error', { message: String(message || 'Unknown error').slice(0, 120), where: String(where || '').slice(0, 120) });
+  };
+  addEventListener('error', (e) => reportError(e.message, e.filename && `${e.filename.split('/').pop()}:${e.lineno}`));
+  addEventListener('unhandledrejection', (e) => reportError(e.reason?.message || e.reason, 'promise'));
   addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
 }
