@@ -96,6 +96,22 @@ GitHub READMEs only show images and never run scripts, so the animation is writt
 
 How it works (`src/lib/svg.js`): each bar with contributions starts sunk into the board and slides up. It's clipped to its own full-height outline, so the part still "underground" is hidden and the bar looks like it's growing. One small animation per bar keeps the file small: about 205 KB for a year where every day is active, about 90 KB for the still image, and much less after gzip. The light sweep is one gradient band masked by the bars.
 
+## Analytics
+
+```mermaid
+flowchart LR
+  P[Landing, Studio, embeds<br/>src/lib/track.js] -- "sendBeacon, batched" --> T["/api/track"]
+  I["/api/heatmap"] -- "after the response" --> C[(daily_counts)]
+  T --> E[(events)]
+  A[admin.html] -- "Clerk session" --> S["/api/admin-stats"]
+  S -- "ADMIN_EMAILS only" --> E & C
+```
+
+- Pages queue events and send them in batches of up to 20 (or every 4 seconds, or when the tab is hidden) with `sendBeacon`, so tracking never slows a page down.
+- `/api/track` drops bots, keeps only the referrer's host, adds country (from Vercel's edge) and device, and replaces the IP with a daily visitor hash. It accepts 30 events per request and 120 per IP per minute.
+- README image renders are counted per user, picture and animation in `daily_counts` (one upsert per render, after the response is sent).
+- The admin numbers are a handful of SQL queries over `events`, run in parallel. At very high volume, add a daily rollup table or move events to a dedicated analytics store; the indexes on `at` and `(name, at)` cover the current queries.
+
 ## Testing
 
 ```bash

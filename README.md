@@ -148,3 +148,18 @@ If GitHub is down or rate limited, the last copy is served instead of an error. 
 npm test                                             # unit tests (animation + caching)
 npm run load-test -- https://YOUR-SITE --requests 1000 --concurrency 100
 ```
+
+## Analytics and the admin page
+
+`/admin.html` shows how the app is doing: visitors per day, page views, the journey from first visit to copied code, where visits come from, which websites embed it, the most clicked buttons, which GitHub users are shown, README image renders, countries, devices, new accounts, revenue and a live feed.
+
+- **Who can see it:** Google accounts whose verified email is listed in `ADMIN_EMAILS`.
+- **What's tracked:** page views and every click on a link or button (automatically), plus named actions: `load_user`, `copy_code`, `embed_view`, `paywall_open`, `export_stl`, `start_build`. Add your own with `track('name', { … })` from `src/lib/track.js`.
+- **Privacy:** no cookies and nothing personal stored. A visitor is a daily hash of IP + browser + a server secret, so the same person counts once a day and can't be followed across days. Bots are skipped. That's why no consent banner is needed.
+- **README images** are counted as renders, not views: GitHub's image proxy and the CDN answer most views without reaching us.
+
+Setup: run `npm run db:migrate` (adds the `events` and `daily_counts` tables) and set `ADMIN_EMAILS` in Vercel.
+
+```bash
+TEST_DATABASE_URL=postgresql://localhost/heatmap_test npm test   # also runs the analytics tests (throwaway database only)
+```
