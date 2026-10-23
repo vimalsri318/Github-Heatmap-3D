@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/migrate-on-deploy.js && vite build",
     "preview": "vite preview",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.js",
     "test": "OBSERVE_QUIET=1 node --test 'test/*.test.js'",

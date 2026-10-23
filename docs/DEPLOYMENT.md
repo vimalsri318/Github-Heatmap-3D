@@ -19,7 +19,7 @@ Production deploys run one at a time and are never cancelled halfway. If any ste
    ```
 3. In Vercel → Settings → Environment Variables (Production), make sure these exist: `DATABASE_URL`, `GITHUB_TOKEN`, `ADMIN_EMAILS`, `ANALYTICS_SALT`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`.
 
-The workflow reads the database address from Vercel at deploy time (`vercel pull`), so it is never stored in GitHub. If `DATABASE_URL` is marked **Sensitive** in Vercel it can't be read back; in that case also add it to GitHub with `gh secret set DATABASE_URL_UNPOOLED` (the direct, non-pooled address).
+Production builds run on Vercel, and `npm run build` applies the migrations first (`scripts/migrate-on-deploy.js`, only when `VERCEL_ENV=production`). The database address stays in Vercel, Sensitive or not, and is never stored in GitHub. The migration output is in the deployment's build log.
 
 Optional: to smoke-test protected preview deployments, turn on Vercel → Settings → Deployment Protection → **Protection Bypass for Automation** and add that value as the `VERCEL_AUTOMATION_BYPASS_SECRET` secret.
 

@@ -3,8 +3,8 @@
 #   push to main → tests + build → database migration → production deployment → smoke test
 #
 # Needs one repository secret: VERCEL_TOKEN (vercel.com/account/tokens, scoped to the team).
-# Everything else, DATABASE_URL included, comes from the Vercel project's own settings
-# (vercel pull), so database credentials are never copied into GitHub.
+# Production builds run on Vercel with the project's own settings, and migrate the database as
+# their first step, so database credentials are never copied into GitHub.
 name: CI/CD
 
 on:
@@ -117,26 +117,12 @@ jobs:
       - run: npm ci
       - name: Check the Vercel token is set
         run: test -n "${{ secrets.VERCEL_TOKEN }}" || { echo "::error::Add the VERCEL_TOKEN repository secret"; exit 1; }
-      - name: Pull production settings from Vercel
-        run: npx vercel@50 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Migrate the production database
-        # migrations run before the new code goes live, and only add things, so the old code keeps working
-        run: |
-          set -a; . .vercel/.env.production.local; set +a
-          # a GitHub secret, when set, wins over what Vercel returned
-          if [ -n "$SECRET_DATABASE_URL" ]; then export DATABASE_URL_UNPOOLED="$SECRET_DATABASE_URL"; fi
-          if [ -z "$DATABASE_URL$DATABASE_URL_UNPOOLED" ]; then
-            echo "::error::DATABASE_URL isn't readable from Vercel (is it marked Sensitive?). Add DATABASE_URL_UNPOOLED as a GitHub secret instead."
-            exit 1
-          fi
-          node scripts/migrate.js
-        env:
-          SECRET_DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
-      - name: Build
-        run: npx vercel@50 build --prod --token=${{ secrets.VERCEL_TOKEN }}
       - id: deploy
-        name: Deploy
-        run: echo "url=$(npx vercel@50 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
+        name: Migrate, build and deploy on Vercel
+        # Vercel builds it with the project's own settings: `npm run build` first applies the
+        # database migrations (scripts/migrate-on-deploy.js), so the database password never
+        # leaves Vercel. A failed migration fails the build, and the live site stays as it was.
+        run: echo "url=$(npx vercel@50 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
       - name: Smoke test the live site
         # the public address, which --prod has just pointed at the new deployment
         run: node scripts/smoke-test.js https://github-heatmap-3d.vercel.app
