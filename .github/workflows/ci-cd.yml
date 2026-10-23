@@ -1,0 +1,145 @@
+# CI on every push and pull request; CD to Vercel.
+#   pull request → tests + build → preview deployment → smoke test → link in a PR comment
+#   push to main → tests + build → database migration → production deployment → smoke test
+#
+# Needs one repository secret: VERCEL_TOKEN (vercel.com/account/tokens, scoped to the team).
+# Everything else, DATABASE_URL included, comes from the Vercel project's own settings
+# (vercel pull), so database credentials are never copied into GitHub.
+name: CI/CD
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VERCEL_ORG_ID: team_bKhtI9gJmqOlAF9U3I5AS3yG
+  VERCEL_PROJECT_ID: prj_ekAaqewENLhBAEmiPhMW9fjkAclW
+  NODE_VERSION: 22
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: test-${{ github.ref }}
+      cancel-in-progress: true
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: heatmap_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/heatmap_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Migrations apply cleanly to an empty database
+        run: DATABASE_URL_UNPOOLED=$TEST_DATABASE_URL npm run db:migrate
+      - name: Migrations are safe to run twice
+        run: DATABASE_URL_UNPOOLED=$TEST_DATABASE_URL npm run db:migrate
+      - run: npm test
+      - run: npm run build
+
+  preview:
+    name: Preview deployment
+    needs: test
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Check the Vercel token is set
+        run: test -n "${{ secrets.VERCEL_TOKEN }}" || { echo "::error::Add the VERCEL_TOKEN repository secret"; exit 1; }
+      - run: npx vercel@50 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - run: npx vercel@50 build --token=${{ secrets.VERCEL_TOKEN }}
+      - id: deploy
+        run: echo "url=$(npx vercel@50 deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
+      - name: Smoke test
+        run: node scripts/smoke-test.js "${{ steps.deploy.outputs.url }}" --no-db --allow-protected
+        env:
+          # optional: Vercel → Settings → Deployment Protection → Protection Bypass for Automation
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Comment the preview link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: `Preview: ${{ steps.deploy.outputs.url }} (smoke test passed)`,
+            });
+
+  production:
+    name: Migrate and deploy to production
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # one production deploy at a time, in order; never cancel one halfway through a migration
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://github-heatmap-3d.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Check the Vercel token is set
+        run: test -n "${{ secrets.VERCEL_TOKEN }}" || { echo "::error::Add the VERCEL_TOKEN repository secret"; exit 1; }
+      - name: Pull production settings from Vercel
+        run: npx vercel@50 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Migrate the production database
+        # migrations run before the new code goes live, and only add things, so the old code keeps working
+        run: |
+          set -a; . .vercel/.env.production.local; set +a
+          # a GitHub secret, when set, wins over what Vercel returned
+          if [ -n "$SECRET_DATABASE_URL" ]; then export DATABASE_URL_UNPOOLED="$SECRET_DATABASE_URL"; fi
+          if [ -z "$DATABASE_URL$DATABASE_URL_UNPOOLED" ]; then
+            echo "::error::DATABASE_URL isn't readable from Vercel (is it marked Sensitive?). Add DATABASE_URL_UNPOOLED as a GitHub secret instead."
+            exit 1
+          fi
+          node scripts/migrate.js
+        env:
+          SECRET_DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      - name: Build
+        run: npx vercel@50 build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - id: deploy
+        name: Deploy
+        run: echo "url=$(npx vercel@50 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
+      - name: Smoke test the live site
+        # the public address, which --prod has just pointed at the new deployment
+        run: node scripts/smoke-test.js https://github-heatmap-3d.vercel.app
+      - name: Show the logs if the smoke test failed
+        if: failure()
+        run: npx vercel@50 logs "${{ steps.deploy.outputs.url }}" --token=${{ secrets.VERCEL_TOKEN }} || true

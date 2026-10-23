@@ -110,7 +110,9 @@ Open `http://localhost:5173` for the landing page or `/studio.html` for the Stud
 
 ## Deploy
 
-Built for [Vercel](https://vercel.com): import the repo and deploy. The static site goes to the CDN and `api/heatmap.js` becomes a serverless function. If the site is served from a different public URL than the one users visit, set `VITE_SITE_URL` so the copied snippets point to it.
+Pushes run tests and a build; merging to `main` migrates the database and deploys to production, then smoke-tests the live site. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+For your own copy: built for [Vercel](https://vercel.com), import the repo and deploy. The static site goes to the CDN and `api/heatmap.js` becomes a serverless function. If the site is served from a different public URL than the one users visit, set `VITE_SITE_URL` so the copied snippets point to it.
 
 ## Project layout
 
