@@ -4,6 +4,7 @@ import { THEMES, getTheme } from './lib/themes.js';
 import { OPTIONS, parseOptions, toParams } from './lib/options.js';
 import { STYLES, getStyle } from './lib/styles/index.js';
 import { composeSong, createSongPlayer } from './lib/song.js';
+import { startTracking, track } from './lib/track.js';
 
 const params = new URLSearchParams(location.search);
 const opts = parseOptions(params);
@@ -32,6 +33,10 @@ const theme = THEMES[STYLES[getStyle(opts.style)].theme || getTheme(opts.theme)]
 
 if (!opts.transparent) document.body.style.background = theme.background;
 $('message').style.color = theme.text;
+
+// an embed's page view says which site it's on (the iframe's referrer is the host page)
+startTracking({ embed: true });
+track('embed_view', { user: opts.user.toLowerCase(), style: opts.style, pro, unlocked });
 
 const map = createHeatmap($('map'), opts);
 if (import.meta.env.DEV) window.__heatmap = map; // for debugging and capturing previews

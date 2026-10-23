@@ -10,6 +10,7 @@ import { STYLES, getStyle } from './lib/styles/index.js';
 import { composeSong, createSongPlayer, renderSongWav } from './lib/song.js';
 import { CHART_TYPES } from './lib/charts.js';
 import { ANIMATIONS } from './lib/svg.js';
+import { startTracking, track } from './lib/track.js';
 import { createViewPad } from './lib/viewpad.js';
 import { suggestDesktop } from './lib/desktop-hint.js';
 import { owns, signInAvailable, signInWithGoogle, currentAccount, onAccountChange, startAccounts, mountAccountButton, authFetch } from './lib/account.js';
@@ -305,6 +306,7 @@ map.on('building', () => setStatus('Growing your forest…'));
 map.on('built', () => setStatus(HOW_TO));
 map.on('load', ({ user, year, days }) => {
   if (user) markStep(1);
+  if (user) track('load_user', { user: user.toLowerCase(), year, style: state.style });
   setStatus(user ? HOW_TO : 'Showing sample data — enter a GitHub username.');
   const { total, best, longest } = computeStats(days);
   $('stats').hidden = false;
@@ -389,6 +391,7 @@ $('exportStl').addEventListener('click', () => {
   if (STYLES[state.style].pro && !owns(state.style)) return openPaywall(state.style);
   const blob = map.exportSTL();
   if (!blob) return;
+  track('export_stl', { style: state.style });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${state.user || 'sample'}-${state.year}-contributions.stl`;
@@ -580,6 +583,7 @@ $('copy').addEventListener('click', async () => {
     setTimeout(() => ($('copy').textContent = 'Copy code'), 1500);
     return;
   }
+  track('copy_code', { dest: tab, style: state.style, user: (state.user || '').toLowerCase(), ...(tab === 'readme' && { picture: $('readmeType').value, animate: $('readmeAnim').value }) });
   showDone(true);
 });
 
@@ -674,6 +678,7 @@ function openPaywall(item) {
   $('payNote').textContent = 'Cancel anytime. Your City stays free forever.';
   $('payNote').classList.remove('pay-warn');
   $('paywall').showModal();
+  track('paywall_open', { item: payItem });
 }
 function setPayPlan(plan) {
   payPlan = plan;
@@ -761,6 +766,7 @@ onAccountChange((a) => {
     signedInNote();
   }
 });
+startTracking();
 startAccounts();
 
 // a purchase lands (the server updates the account): close the paywall and carry on

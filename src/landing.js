@@ -17,6 +17,7 @@ import { startAccounts, signInWithGoogle, mountAccountButton, onAccountChange, s
 import { pricesFor, money, guessCountry } from './lib/pricing.js';
 import { openRegionPicker } from './lib/region-picker.js';
 import { defaults } from './lib/options.js';
+import { startTracking, track } from './lib/track.js';
 
 // The landing page shows a built-in demo year (every month filled), labelled as yours.
 const HERO_USER = 'you';
@@ -303,6 +304,7 @@ $('buildForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const user = $('buildUser').value.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?github\.com\//, '').split('/')[0];
   if (!user) return $('buildUser').focus();
+  track('start_build', { user: user.toLowerCase(), style: buildStyle });
   location.href = `/studio.html?${new URLSearchParams({ user, style: buildStyle })}`;
 });
 
@@ -630,6 +632,7 @@ $('navAccount').addEventListener('click', (e) => {
   if (!signInAvailable()) return;
   signInWithGoogle().catch(() => {});
 });
+startTracking();
 startAccounts();
 
 suggestDesktop();
